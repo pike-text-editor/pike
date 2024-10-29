@@ -5,7 +5,8 @@
 ## Opis zadania
 
 Tematem naszego projektu jest implementacja prostego, funkcjonalnego terminalowego edytora tekstu, na wzór nano, z trochę innym
-zestawem funkcjonalności.
+zestawem funkcjonalności. Wybraliśmy rusta, za backend będzie służył [crossterm](https://docs.rs/crossterm/latest/crossterm/), a frontend zrealizujemy przy pomocy
+[ratatui](https://ratatui.rs/).
 
 ### Funkcjonalności
 
@@ -21,9 +22,7 @@ zestawem funkcjonalności.
 
 #### Pasek statusowy
 
-* nazwa pliku
-* ile niezapisanych zmian
-* filetype
+* nazwa pliku, filetype, ewentualnie podpowiedzi dotyczące skrótów klawiszowych
 
 #### Plik konfiguracyjny
 
