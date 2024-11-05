@@ -1,6 +1,4 @@
-use std::{collections::HashMap, error::Error};
-
-// Every keymappable operation within pike
+/// Every keymappable operation within pike
 #[derive(Debug)]
 pub enum Operation {
     CreateNewFile,

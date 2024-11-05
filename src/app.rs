@@ -8,6 +8,7 @@ use ratatui::{
     Terminal,
 };
 
+/// TUI application which displays the UI and handles events
 #[derive(Default)]
 pub struct App {
     exit: bool,
