@@ -30,7 +30,7 @@ pub struct Config {
 }
 
 /// Loads the configuration from the config file and returns it
-fn load_config() -> Config {
+pub fn load_config() -> Config {
     // TODO: convert to hashmap using toml and parse keybinds
     todo!()
 }
