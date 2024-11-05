@@ -1,15 +1,16 @@
 use std::path::{Path, PathBuf};
 
-use crate::config;
 use crate::config::Config;
 use scribe::Workspace;
 
 /// Backend of the app
+#[allow(dead_code, unused_variables, unused_mut)]
 pub struct Pike {
     workspace: Workspace,
     config: Config,
 }
 
+#[allow(dead_code, unused_variables, unused_mut)]
 impl Pike {
     /// Create a new instance of Pike in a given directory
     fn new(path: &Path, file: Option<&Path>) -> Result<Pike, String> {
@@ -70,6 +71,7 @@ impl Pike {
 }
 
 #[cfg(test)]
+#[allow(clippy::assertions_on_constants)]
 mod test {
     #[test]
     fn doesnt_fail() {

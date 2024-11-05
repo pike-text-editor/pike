@@ -9,11 +9,13 @@ use ratatui::{
 };
 
 /// TUI application which displays the UI and handles events
+#[allow(dead_code)]
 #[derive(Default)]
 pub struct App {
     exit: bool,
 }
 
+#[allow(dead_code, unused_variables, unused_mut)]
 impl App {
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         loop {
