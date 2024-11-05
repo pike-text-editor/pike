@@ -1,8 +1,9 @@
 mod app;
-use std::io::Stdout;
+mod config;
+mod operations;
+mod pike;
 
 use app::App;
-use ratatui::prelude::CrosstermBackend;
 
 fn main() {
     let mut terminal = ratatui::init();
