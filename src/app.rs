@@ -33,7 +33,7 @@ impl App {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(1)]);
         let area = layout.split(frame.area())[0];
-        let block = Block::default().title("Hello pico");
+        let block = Block::default().title("Hello pike");
         frame.render_widget(block, area);
     }
 
