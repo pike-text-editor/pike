@@ -79,4 +79,14 @@ impl App {
     fn exit(&mut self) {
         self.exit = true;
     }
+
+    /// Open a file finder by name in the current working directory
+    fn find_files_in_cwd(&mut self) {
+        todo!()
+    }
+
+    /// Open a text finder in the current working directory
+    fn find_words_in_cwd() {
+        todo!()
+    }
 }

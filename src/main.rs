@@ -2,6 +2,7 @@ mod app;
 mod config;
 mod operations;
 mod pike;
+mod ui;
 
 use std::io;
 
