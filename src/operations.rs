@@ -3,6 +3,7 @@
 #[derive(Debug)]
 pub enum Operation {
     CreateNewFile,
+    OpenFile,
 
     CreateNewBuffer,
     SwitchToPreviousBuffer,
@@ -27,6 +28,7 @@ impl Operation {
     pub fn from_string(query: &str) -> Option<Operation> {
         match query {
             "new_file" => Some(Operation::CreateNewFile),
+            "open_file" => Some(Operation::OpenFile),
             "new_buffer" => Some(Operation::CreateNewBuffer),
             "previous_buffer" => Some(Operation::SwitchToPreviousBuffer),
             "next_buffer" => Some(Operation::SwitchToNextBuffer),
