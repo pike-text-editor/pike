@@ -15,7 +15,10 @@ struct KeyShortcut {
 impl KeyShortcut {
     /// Creates a new KeyShortcut from a crossterm::event::KeyEvent
     fn from_key_event(event: &KeyEvent) -> KeyShortcut {
-        todo!()
+        KeyShortcut {
+            code: event.code,
+            modifiers: event.modifiers,
+        }
     }
 
     /// Creates a new KeyShortcut based on a string from a config file
@@ -37,4 +40,38 @@ pub struct Config {
 pub fn load_config() -> Config {
     // TODO: convert to hashmap using toml and parse keybinds
     todo!()
+}
+
+#[cfg(test)]
+mod key_shortcut_test {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    use super::KeyShortcut;
+
+    #[test]
+    fn from_event() {
+        let events = [
+            (KeyEvent::new(KeyCode::Char('q'), KeyModifiers::empty())),
+            (KeyEvent::new(KeyCode::Char('s'), KeyModifiers::SHIFT)),
+            (KeyEvent::new(
+                KeyCode::Char('p'),
+                KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+            )),
+            (KeyEvent::new(
+                KeyCode::Char('y'),
+                KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT,
+            )),
+            (KeyEvent::new(
+                KeyCode::Null,
+                KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT,
+            )),
+        ];
+
+        let shortcuts = events.map(|event| KeyShortcut::from_key_event(&event));
+
+        for (event, shortcut) in events.iter().zip(shortcuts.iter()) {
+            assert_eq!(shortcut.code, event.code);
+            assert_eq!(shortcut.modifiers, event.modifiers);
+        }
+    }
 }
