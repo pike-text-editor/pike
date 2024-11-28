@@ -22,14 +22,18 @@ wybór pliku do otwarcia przy wyszukiwaniu po nazwie
 ## Użycie
 
 `cargo run` uruchamia projekt
+
 `cargo test` uruchamia przykładowy przechodzący test
+
 `cargo doc -p pike` generuje dokumentację na podstawie komentarzy
 
 ### Kompilacja dla windows
 
 Do kompilacji skrośnej na Windowsa używamy [cross](https://github.com/cross-rs/cross).
+
 Wymaga on dostępu do dockera lub podmana na hoście,
 więcej w [dokumentacji](https://github.com/cross-rs/cross?tab=readme-ov-file#usage).
 
 `cross build --target=x86_64-pc-windows-gnu` kompiluje projekt na windows toolchainem gnu
+
 `cross test --target=x86_64-pc-windows-gnu` uruchamia testy dla windowsa w skonteneryzowanym środowisku
