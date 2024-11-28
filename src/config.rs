@@ -65,6 +65,14 @@ mod key_shortcut_test {
                 KeyCode::Null,
                 KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT,
             )),
+            (KeyEvent::new(
+                KeyCode::Esc,
+                KeyModifiers::SHIFT,
+            )),
+            (KeyEvent::new(
+                KeyCode::F(1),
+                KeyModifiers::SHIFT,
+            ))
         ];
 
         let shortcuts = events.map(|event| KeyShortcut::from_key_event(&event));
