@@ -5,4 +5,5 @@
 /// As of now, I can't look that far into the future without writing
 /// some code to know what fields this should keep and how it shoul
 /// behave, so it's empty
+#[allow(dead_code)]
 struct Picker {}
