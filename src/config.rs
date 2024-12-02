@@ -5,15 +5,18 @@ use crate::operations::Operation;
 use std::collections::HashMap;
 
 /// Represents a single shortcut consisting of a key and modifiers
-#[allow(dead_code, unused_variables, unused_mut)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct KeyShortcut {
     code: KeyCode,
     modifiers: KeyModifiers,
 }
 
-#[allow(dead_code, unused_variables, unused_mut)]
+#[allow(dead_code)]
 impl KeyShortcut {
+    fn new(code: KeyCode, modifiers: KeyModifiers) -> KeyShortcut {
+        KeyShortcut { code, modifiers }
+    }
+
     /// Creates a new KeyShortcut from a crossterm::event::KeyEvent
     fn from_key_event(event: &KeyEvent) -> KeyShortcut {
         KeyShortcut::new(event.code, event.modifiers)
@@ -45,10 +48,6 @@ impl KeyShortcut {
             return Err(String::from("No keycode found in keybind: {s}"));
         }
         Ok(shortcut)
-    }
-
-    fn new(code: KeyCode, modifiers: KeyModifiers) -> KeyShortcut {
-        KeyShortcut { code, modifiers }
     }
 
     /// Returns true if the shortcut is empty, i.e. no key or modifier is set
@@ -111,13 +110,12 @@ fn keycode_from_string(s: &str) -> Result<KeyCode, String> {
 }
 
 /// Editor configuration
-#[allow(dead_code, unused_variables, unused_mut)]
 #[derive(Debug)]
 pub struct Config {
     key_mappings: HashMap<KeyShortcut, Operation>,
 }
 
-#[allow(dead_code, unused_variables, unused_mut)]
+#[allow(dead_code)]
 impl Config {
     /// Creates a config instance based on toml string representation
     fn from_toml_representation(s: &str) -> Result<Config, String> {
@@ -354,7 +352,13 @@ mod config_test {
 
     #[test]
     fn from_toml_representation_invalid_keymap_section() {
-        let invalid_representations = ["keymaps = {invalid}", "invalid section"];
+        let invalid_representations = [
+            "keymaps = {invalid}",
+            r#"
+                [keymaps]
+                ctrl+s="nonexisting_action"
+                "#,
+        ];
 
         for s in invalid_representations {
             assert!(
@@ -362,5 +366,30 @@ mod config_test {
                 "Failed for: {s}"
             );
         }
+    }
+
+    #[test]
+    fn test_from_file_valid_case() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let toml_content = r#"
+        [keymaps]
+        "ctrl+s" = "save"
+    "#;
+        temp_file
+            .write_all(toml_content.as_bytes())
+            .expect("Failed to write to temp file");
+
+        let config = Config::from_file(temp_file.path().to_str().unwrap())
+            .expect("Failed to parse config from file");
+
+        assert_eq!(
+            config
+                .key_mappings
+                .get(&KeyShortcut::new(KeyCode::Char('s'), KeyModifiers::CONTROL,)),
+            Some(&Operation::SaveBufferToFile)
+        );
     }
 }
