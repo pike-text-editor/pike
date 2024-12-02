@@ -1,11 +1,12 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use toml::Table;
 
 use crate::operations::Operation;
 use std::collections::HashMap;
 
 /// Represents a single shortcut consisting of a key and modifiers
 #[allow(dead_code, unused_variables, unused_mut)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct KeyShortcut {
     code: KeyCode,
     modifiers: KeyModifiers,
@@ -39,11 +40,11 @@ impl KeyShortcut {
             }
         }
 
-        let shorctut = KeyShortcut::new(code, modifiers);
-        if shorctut.is_empty() {
+        let shortcut = KeyShortcut::new(code, modifiers);
+        if shortcut.is_empty() {
             return Err(String::from("No keycode found in keybind: {s}"));
         }
-        Ok(shorctut)
+        Ok(shortcut)
     }
 
     fn new(code: KeyCode, modifiers: KeyModifiers) -> KeyShortcut {
@@ -117,10 +118,32 @@ pub struct Config {
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
-/// Loads the configuration from the config file and returns it
-pub fn load_config() -> Config {
-    // TODO: convert to hashmap using toml and parse keybinds
-    todo!()
+impl Config {
+    /// Creates a config instance based on toml string representation
+    fn from_toml_representation(s: &str) -> Result<Config, String> {
+        let mut return_value = Config {
+            key_mappings: HashMap::new(),
+        };
+        let parsed = s
+            .parse::<Table>()
+            .map_err(|e| format!("Error parsing configuration file: {e}"))?;
+
+        if let Some(keys) = parsed.get("keymaps") {
+            for (shortcut, op) in keys.as_table().unwrap() {
+                let shortcut = KeyShortcut::from_string(shortcut)?;
+                let op = Operation::from_string(op.as_str().unwrap())?;
+                return_value.key_mappings.insert(shortcut, op);
+            }
+        }
+        Ok(return_value)
+    }
+
+    /// Loads the configuration from the config file and returns it
+    fn from_file(path: &str) -> Result<Config, String> {
+        let contents =
+            std::fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
+        Config::from_toml_representation(&contents)
+    }
 }
 
 #[cfg(test)]
@@ -224,6 +247,120 @@ mod key_shortcut_test {
         let invalid_strings = vec!["", "a+b", "abc", "ctrl+shift+alt+del+ctrl"];
         for s in invalid_strings {
             assert!(KeyShortcut::from_string(s).is_err());
+        }
+    }
+}
+
+#[cfg(test)]
+mod config_test {
+    use std::collections::HashMap;
+
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    use crate::operations::Operation;
+
+    use super::{Config, KeyShortcut};
+
+    #[test]
+    fn from_toml_keymap_section_valid_case() {
+        let keymap_section = r#"
+            [keymaps]
+            "ctrl+shift+n" = "new_file"
+            "ctrl+o" = "open_file"
+            "ctrl+n" = "new_buffer"
+            "ctrl+tab" = "next_buffer"
+            "ctrl+shift+tab" = "previous_buffer"
+            "ctrl+b" = "open_buffer_picker"
+            "ctrl+f" = "search_in_current_buffer"
+            "ctrl+h" = "replace_in_current_buffer"
+            "ctrl+s" = "save"
+            "ctrl+z" = "undo"
+            "ctrl+shift+z" = "redo"
+            "ctrl+shift+f" = "find_files_in_cwd"
+            "ctrl+shift+p" = "find_text_in_cwd"
+            "#;
+
+        let actual = Config::from_toml_representation(keymap_section)
+            .expect("Failed to parse a valid keymap section")
+            .key_mappings;
+        let expected = HashMap::<KeyShortcut, Operation>::from_iter(vec![
+            (
+                KeyShortcut::new(
+                    KeyCode::Char('n'),
+                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+                ),
+                Operation::CreateNewFile,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('o'), KeyModifiers::CONTROL),
+                Operation::OpenFile,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
+                Operation::CreateNewBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Tab, KeyModifiers::CONTROL),
+                Operation::SwitchToNextBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Tab, KeyModifiers::SHIFT | KeyModifiers::CONTROL),
+                Operation::SwitchToPreviousBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
+                Operation::OpenBufferPicker,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+                Operation::SearchInCurrentBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+                Operation::SearchAndReplaceInCurrentBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+                Operation::SaveBufferToFile,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('z'), KeyModifiers::CONTROL),
+                Operation::Undo,
+            ),
+            (
+                KeyShortcut::new(
+                    KeyCode::Char('z'),
+                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+                ),
+                Operation::Redo,
+            ),
+            (
+                KeyShortcut::new(
+                    KeyCode::Char('f'),
+                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+                ),
+                Operation::FindFilesInCWD,
+            ),
+            (
+                KeyShortcut::new(
+                    KeyCode::Char('p'),
+                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+                ),
+                Operation::FindTextInCWD,
+            ),
+        ]);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn from_toml_representation_invalid_keymap_section() {
+        let invalid_representations = ["keymaps = {invalid}", "invalid section"];
+
+        for s in invalid_representations {
+            assert!(
+                Config::from_toml_representation(s).is_err(),
+                "Failed for: {s}"
+            );
         }
     }
 }
