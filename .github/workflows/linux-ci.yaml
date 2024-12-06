@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - 2-setup-cicd
   pull_request:
     branches:
       - main
