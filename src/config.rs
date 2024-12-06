@@ -6,7 +6,7 @@ use crate::operations::Operation;
 use std::collections::{HashMap, HashSet};
 
 /// Editor configuration
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Config {
     key_mappings: HashMap<KeyShortcut, Operation>,
 }
@@ -30,10 +30,15 @@ impl Config {
     }
 
     /// Loads the configuration from the config file and returns it
-    fn from_file(path: &str) -> Result<Config, String> {
-        let contents =
-            std::fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
-        Config::from_toml_representation(&contents)
+    fn from_file(path: Option<&str>) -> Result<Config, String> {
+        match path {
+            Some(path) => {
+                let contents = std::fs::read_to_string(path)
+                    .map_err(|e| format!("Error reading file: {e}"))?;
+                Config::from_toml_representation(&contents)
+            }
+            None => Ok(Config::default()),
+        }
     }
 
     /// Creates a vector of pairs (shortcut, operation) to
@@ -275,7 +280,7 @@ mod config_test {
             .write_all(toml_content.as_bytes())
             .expect("Failed to write to temp file");
 
-        let config = Config::from_file(temp_file.path().to_str().unwrap())
+        let config = Config::from_file(Some(temp_file.path().to_str().unwrap()))
             .expect("Failed to parse config from file");
 
         assert_eq!(
@@ -284,5 +289,11 @@ mod config_test {
                 .get(&KeyShortcut::new(KeyCode::Char('s'), KeyModifiers::CONTROL,)),
             Some(&Operation::SaveBufferToFile)
         );
+    }
+
+    #[test]
+    fn test_from_file_no_path() {
+        let config = Config::from_file(None).expect("Failed to parse config from file");
+        assert_eq!(config, Config::default());
     }
 }
