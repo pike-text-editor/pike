@@ -144,6 +144,72 @@ impl Config {
     }
 }
 
+impl Default for Config {
+    fn default() -> Config {
+        let key_mappings = HashMap::<KeyShortcut, Operation>::from([
+            (
+                KeyShortcut::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+                Operation::SaveBufferToFile,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('o'), KeyModifiers::CONTROL),
+                Operation::OpenFile,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
+                Operation::CreateNewBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Tab, KeyModifiers::CONTROL),
+                Operation::SwitchToNextBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Tab, KeyModifiers::SHIFT | KeyModifiers::CONTROL),
+                Operation::SwitchToPreviousBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
+                Operation::OpenBufferPicker,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+                Operation::SearchInCurrentBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+                Operation::SearchAndReplaceInCurrentBuffer,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('z'), KeyModifiers::CONTROL),
+                Operation::Undo,
+            ),
+            (
+                KeyShortcut::new(
+                    KeyCode::Char('z'),
+                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+                ),
+                Operation::Redo,
+            ),
+            (
+                KeyShortcut::new(
+                    KeyCode::Char('f'),
+                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+                ),
+                Operation::FindFilesInCWD,
+            ),
+            (
+                KeyShortcut::new(
+                    KeyCode::Char('p'),
+                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
+                ),
+                Operation::FindTextInCWD,
+            ),
+        ]);
+
+        Config { key_mappings }
+    }
+}
+
 #[cfg(test)]
 mod key_shortcut_test {
 
