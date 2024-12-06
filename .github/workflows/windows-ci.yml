@@ -1,7 +1,12 @@
 name: Windows CI
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: "Run tests?"
+        required: true
+        default: "yes"
   push:
     branches:
       - main
