@@ -1,0 +1,30 @@
+name: Windows CI Combined
+
+on:
+  push:
+    branches:
+      - main
+      - 2-setup-cicd
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  combined-windows:
+    name: Build and Test for Windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Install Cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build and Test for Windows
+        run: |
+          just windows-build
+          just windows-test
