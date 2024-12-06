@@ -1,6 +1,6 @@
 #[allow(dead_code, unused_variables, unused_mut)]
 /// Every keymappable operation within pike
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Operation {
     CreateNewFile,
     OpenFile,

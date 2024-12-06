@@ -2,10 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use toml::Table;
 
 use crate::operations::Operation;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Represents a single shortcut consisting of a key and modifiers
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct KeyShortcut {
     code: KeyCode,
     modifiers: KeyModifiers,
@@ -119,19 +119,41 @@ pub struct Config {
 impl Config {
     /// Creates a config instance based on toml string representation
     fn from_toml_representation(s: &str) -> Result<Config, String> {
-        let mut return_value = Config {
-            key_mappings: HashMap::new(),
-        };
+        let mut return_value = Config::default();
+
         let parsed = s
             .parse::<Table>()
             .map_err(|e| format!("Error parsing configuration file: {e}"))?;
 
-        if let Some(keys) = parsed.get("keymaps") {
-            for (shortcut, op) in keys.as_table().unwrap() {
-                let shortcut = KeyShortcut::from_string(shortcut)?;
-                let op = Operation::from_string(op.as_str().unwrap())?;
-                return_value.key_mappings.insert(shortcut, op);
+        if let Some(keymap_table) = parsed.get("keymaps").and_then(|keys| keys.as_table()) {
+            let keymap_pairs = Config::keymap_pairs_from_toml_table(keymap_table)?;
+            return_value.key_mappings.extend(keymap_pairs);
+        }
+
+        Ok(return_value)
+    }
+
+    fn keymap_pairs_from_toml_table(
+        table: &Table,
+    ) -> Result<Vec<(KeyShortcut, Operation)>, String> {
+        let mut return_value = Vec::<(KeyShortcut, Operation)>::new();
+        let mut seen_shortcuts = HashSet::<KeyShortcut>::new();
+        let mut seen_operations = HashSet::<Operation>::new();
+
+        for (shortcut, op) in table {
+            let shortcut = KeyShortcut::from_string(shortcut)?;
+            let op = Operation::from_string(op.as_str().unwrap())?;
+
+            if !seen_shortcuts.insert(shortcut.clone()) {
+                return Err(format!("Duplicate keybinding found: {:?}", shortcut));
             }
+
+            // Check for duplicate operations
+            if !seen_operations.insert(op.clone()) {
+                return Err(format!("Duplicate keymap operation found: {:?}", op));
+            }
+
+            return_value.push((shortcut, op));
         }
         Ok(return_value)
     }
@@ -329,19 +351,7 @@ mod config_test {
     fn from_toml_keymap_section_valid_case() {
         let keymap_section = r#"
             [keymaps]
-            "ctrl+shift+n" = "new_file"
-            "ctrl+o" = "open_file"
-            "ctrl+n" = "new_buffer"
-            "ctrl+tab" = "next_buffer"
-            "ctrl+shift+tab" = "previous_buffer"
-            "ctrl+b" = "open_buffer_picker"
-            "ctrl+f" = "search_in_current_buffer"
-            "ctrl+h" = "replace_in_current_buffer"
-            "ctrl+s" = "save"
-            "ctrl+z" = "undo"
-            "ctrl+shift+z" = "redo"
-            "ctrl+shift+f" = "find_files_in_cwd"
-            "ctrl+shift+p" = "find_text_in_cwd"
+            "ctrl+shift+x" = "new_file"
             "#;
 
         let actual = Config::from_toml_representation(keymap_section)
@@ -350,7 +360,7 @@ mod config_test {
         let expected = HashMap::<KeyShortcut, Operation>::from_iter(vec![
             (
                 KeyShortcut::new(
-                    KeyCode::Char('n'),
+                    KeyCode::Char('x'),
                     KeyModifiers::SHIFT | KeyModifiers::CONTROL,
                 ),
                 Operation::CreateNewFile,
@@ -414,6 +424,29 @@ mod config_test {
             ),
         ]);
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn from_toml_representation_keymap_section_duplicates() {
+        let representations = [
+            r#"
+                [keymaps]
+                "ctrl+s" = "open_file"
+                "ctrl+y" = "open_file"
+                "#,
+            r#"
+                [keymaps]
+                "ctrl+s" = "save"
+                "ctrl+s" = "open_file"
+                "#,
+        ];
+
+        for s in representations {
+            assert!(
+                Config::from_toml_representation(s).is_err(),
+                "Failed for: {s}"
+            );
+        }
     }
 
     #[test]
