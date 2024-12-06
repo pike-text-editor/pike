@@ -29,6 +29,16 @@ impl Config {
         Ok(return_value)
     }
 
+    /// Loads the configuration from the config file and returns it
+    fn from_file(path: &str) -> Result<Config, String> {
+        let contents =
+            std::fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
+        Config::from_toml_representation(&contents)
+    }
+
+    /// Creates a vector of pairs (shortcut, operation) to
+    /// be inserted into the config's keymap section
+    /// over the default configuration
     fn keymap_pairs_from_toml_table(
         table: &Table,
     ) -> Result<Vec<(KeyShortcut, Operation)>, String> {
@@ -52,13 +62,6 @@ impl Config {
             return_value.push((shortcut, op));
         }
         Ok(return_value)
-    }
-
-    /// Loads the configuration from the config file and returns it
-    fn from_file(path: &str) -> Result<Config, String> {
-        let contents =
-            std::fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
-        Config::from_toml_representation(&contents)
     }
 }
 
