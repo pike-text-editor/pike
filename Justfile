@@ -17,3 +17,11 @@ windows-build:
 # Run tests for Windows using cross
 windows-test:
     cross test --target=x86_64-pc-windows-gnu --verbose
+
+
+# Generate HTML test coverage report in target/coverage/html
+# Requires cargo-binutils and grcov to be installed
+cov:
+    CARGO_INCREMENTAL=0 RUSTFLAGS='-Cinstrument-coverage' LLVM_PROFILE_FILE='cargo-test-%p-%m.profraw' cargo test
+    grcov . --binary-path ./target/debug/deps/ -s . -t html --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o target/coverage/html
+    rm *profraw
