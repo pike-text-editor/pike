@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod key_shortcut;
 mod operations;
 mod pike;
 mod ui;
