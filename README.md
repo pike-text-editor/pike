@@ -21,13 +21,35 @@ wybór pliku do otwarcia przy wyszukiwaniu po nazwie
 
 ## Użycie
 
+### Przy pomocy `just`
+
+`just lint` sprawdza kod za pomocą `cargo clippy`.
+
+`just build` buduje projekt w trybie release.
+
+`just test` uruchamia testy z włączonymi wszystkimi funkcjami.
+
+`just windows-build` buduje projekt dla Windowsa za pomocą `cross`.
+
+* wymaga [cross](https://github.com/cross-rs/cross).
+
+`just windows-test` uruchamia testy dla Windowsa za pomocą `cross`.
+
+* wymaga [cross](https://github.com/cross-rs/cross).
+
+`just cov` generuje raport pokrycia testami w formacie HTML.
+
+* wymaga [cargo-binutils](https://github.com/rust-embedded/cargo-binutils) oraz [grcov](https://github.com/mozilla/grcov)
+
+### Bez `just`
+
 `cargo run` uruchamia projekt
 
 `cargo test` uruchamia przykładowy przechodzący test
 
 `cargo doc -p pike` generuje dokumentację na podstawie komentarzy
 
-### Kompilacja dla windows
+#### Kompilacja dla windows
 
 Do kompilacji skrośnej na Windowsa używamy [cross](https://github.com/cross-rs/cross).
 
@@ -38,9 +60,9 @@ więcej w [dokumentacji](https://github.com/cross-rs/cross?tab=readme-ov-file#us
 
 `cross test --target=x86_64-pc-windows-gnu` uruchamia testy dla windowsa w skonteneryzowanym środowisku
 
-### Narzędzia
+#### Narzędzia
 
-#### Formatter
+##### Formatter
 
 Używanym w projekcie formatterem jest [rustfmt](https://github.com/rust-lang/rustfmt).
 
@@ -58,7 +80,7 @@ cargo fmt           # formatuje pliki in-place
 cargo fmt --check   # nie formatuje plików in-place
 ```
 
-#### Linter
+##### Linter
 
 Używanym linterem jest [clippy](https://github.com/rust-lang/rust-clippy)
 

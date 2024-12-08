@@ -1,73 +1,101 @@
-# pike (perfectly incomplex konsole editor) - dokumentacja wstępna
+
+# pike (perfectly incomplex konsole editor) - szkielet kodu
 
 #### Maksym Bieńkowski, Jędrzej Grabski
 
-## Opis zadania
+Branch zawiera szkielet kodu z ogólnymi, niewypełnionymi sygnaturami
+oraz definicjami obiektów. Szybki overview modułów:
 
-Tematem naszego projektu jest implementacja prostego, funkcjonalnego terminalowego edytora tekstu, na wzór nano, z trochę innym
-zestawem funkcjonalności. Wybraliśmy rusta, za backend będzie służył [crossterm](https://docs.rs/crossterm/latest/crossterm/), a frontend zrealizujemy przy pomocy
-[ratatui](https://ratatui.rs/).
+* `app` - zawiera frontendową porcję projektu, obiekt reprezentujący jego stan,
+funkcjonalność związaną z obsługą zdarzeń i rysowaniem ekranu.
+* `pike` - reprezentacja backendowej części projektu, zarządza otwartymi buforami, trzyma
+informację o cwd, wchodzi w interakcję z systemem plików
+* `config` - zawiera obiekt reprezentujący konfigurację użytkownika, który ładowany
+będzie z pliku konfiguracyjnego. Póki co, jedynymi wspieranymi ustawieniami są
+skróty klawiszowe, prawdopodobnie się to zmieni na przestrzeni czasu.
+* `operations` - enumeracja reprezentująca mapowalne na skróty klawiszowe
+operacje i tworzenie ich na podstawie stringów zawartych w pliku
+* `ui` - moduł zawierający reużywalne komponenty frontendowe, na ten moment
+ograniczony do obiektu `Picker`, na podstawie którego ma działać m.in.
+wybór pliku do otwarcia przy wyszukiwaniu po nazwie
 
-### Funkcjonalności
+## Użycie
 
-#### Edytowanie tekstu w stylu nano
+### Przy pomocy `just`
 
-* początkowo zawartość pliku reprezentowana jako string
-* później przejście na gap buffer
+`just lint` sprawdza kod za pomocą `cargo clippy`.
 
-#### Undo/redo
+`just build` buduje projekt w trybie release.
 
-* historia liniowa, deque n ostatnich zmian
-* zmiana składa się z offsetu od początku pliku, w którym wystąpiła, typu (dodaj/usuń) i tekstu, który został usunięty/dodany
+`just test` uruchamia testy z włączonymi wszystkimi funkcjami.
 
-#### Pasek statusowy
+`just windows-build` buduje projekt dla Windowsa za pomocą `cross`.
 
-* nazwa pliku, filetype, ewentualnie podpowiedzi dotyczące skrótów klawiszowych
+* wymaga [cross](https://github.com/cross-rs/cross).
 
-#### Plik konfiguracyjny
+`just windows-test` uruchamia testy dla Windowsa za pomocą `cross`.
 
-* format `toml`
-* skróty klawiszowe
-* ogólne ustawienia
+* wymaga [cross](https://github.com/cross-rs/cross).
 
-#### Tworzenie plików i katalogów w cwd bez opuszczania edytora (zmiana edytowanego pliku)
+`just cov` generuje raport pokrycia testami w formacie HTML.
 
-* pod określonym keymapem, jak `:e` w vim
+* wymaga [cargo-binutils](https://github.com/rust-embedded/cargo-binutils) oraz [grcov](https://github.com/mozilla/grcov)
 
-#### Wyszukiwanie w pliku
+### Bez `just`
 
-* Na bazie [ekosystemu rg](https://github.com/BurntSushi/ripgrep/tree/master/crates)
+`cargo run` uruchamia projekt
 
-#### Wyszukiwanie tekstu w cwd
+`cargo test` uruchamia przykładowy przechodzący test
 
-* funkcjonalność na wzór [Telescope.find_text]( "https://github.com/nvim-telescope/telescope.nvim" )
-* na bazie ekosystemu rg
+`cargo doc -p pike` generuje dokumentację na podstawie komentarzy
 
-#### Wyszukiwanie plików w cwd
+#### Kompilacja dla windows
 
-* funkcjonalność na wzór [Telescope.find_files]( "https://github.com/nvim-telescope/telescope.nvim" )
-* [Walkdir](https://rust-lang-nursery.github.io/rust-cookbook/file/dir.html) + regex
+Do kompilacji skrośnej na Windowsa używamy [cross](https://github.com/cross-rs/cross).
 
-#### Find and replace
+Wymaga on dostępu do dockera lub podmana na hoście,
+więcej w [dokumentacji](https://github.com/cross-rs/cross?tab=readme-ov-file#usage).
 
-* prawdopodobnie integracja z `sed` i możliwość wprowadzenia komendy na poziomie edytora, jak w vimie
+`cross build --target=x86_64-pc-windows-gnu` kompiluje projekt na windows toolchainem gnu
 
-#### Swapfile
+`cross test --target=x86_64-pc-windows-gnu` uruchamia testy dla windowsa w skonteneryzowanym środowisku
 
-* na start kopia bufora przechowywana w określonym miejscu
-* przy uruchomieniu, edytor szuka pliku i rozwiązuje ewentualne konflikty
+#### Narzędzia
 
-#### Podstawowy syntax highlighting
+##### Formatter
 
-* rozwiązanie podobne do [kibi](https://github.com/ilai-deutel/kibi/blob/master/src/row.rs#L79) lub [kilo](https://github.com/antirez/kilo/blob/master/kilo.c#L364)
+Używanym w projekcie formatterem jest [rustfmt](https://github.com/rust-lang/rustfmt).
 
-### Opcjonalne funkcjonalności, jeśli zostanie czas
+Instalacja:
 
-* file picker drzewiasty/netrw
-* integracja z autoformaterami ran on save, podpinane pod file type w pliku konfiguracyjnym
-* wsparcie kilku trybów edytowania, uproszczony vim mode
-* konfiguracja themes przez plik konfiguracyjny
-* nagrywanie macro
-* podstawowy autocompletion na podstawie wyrażeń zawartych w buforze, bez integracji z lsp
-* sensowne api umożliwiające pisanie wtyczek, np. do integracji z build toolami, na wzór vima
-* możliwość uruchamiania komend bez opuszczania edytora
+```bash
+rustup update
+rustup component add rustfmt
+```
+
+Uruchomienie:
+
+```bash
+cargo fmt           # formatuje pliki in-place
+cargo fmt --check   # nie formatuje plików in-place
+```
+
+##### Linter
+
+Używanym linterem jest [clippy](https://github.com/rust-lang/rust-clippy)
+
+Instalacja:
+
+```bash
+rustup update
+rustup component add clippy
+```
+
+Uruchomienie:
+
+```bash
+cargo clippy        # bez aplikowania sugestii
+cargo clippy --fix  # aplikuje sugestie
+```
+
+Oba narzędzia powinny być dostępne w domyślnej instalacji Rusta
