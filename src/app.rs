@@ -8,15 +8,48 @@ use ratatui::{
     Terminal,
 };
 
+use crate::pike::Pike;
+
 /// TUI application which displays the UI and handles events
 #[allow(dead_code)]
-#[derive(Default)]
 pub struct App {
     exit: bool,
+    backend: Pike,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
 impl App {
+    pub fn build(args: &[String]) -> App {
+        let cwd = std::env::current_dir().expect("Failed to get current working directory");
+
+        let backend: Result<Pike, String> = match args.len() {
+            1 => Pike::new(cwd, None),
+            2 => {
+                let mut fpath = cwd.clone();
+                let fname = args[1].clone();
+
+                fpath.push(fname);
+                Pike::new(cwd, Some(fpath))
+            }
+            other => Err(format!("Usage: {} [path]", args[0])),
+        };
+
+        match backend {
+            Ok(backend) => App::new(backend),
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    fn new(backend: Pike) -> App {
+        App {
+            exit: false,
+            backend,
+        }
+    }
+
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         loop {
             if self.exit {
