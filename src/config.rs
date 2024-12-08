@@ -3,7 +3,12 @@ use toml::Table;
 
 use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
+
+pub const DEFAULT_CONFIG_PATH: &str = "~/.config/pike.toml";
 
 /// Editor configuration
 #[derive(Debug, PartialEq, Eq)]
@@ -30,7 +35,7 @@ impl Config {
     }
 
     /// Loads the configuration from the config file and returns it
-    fn from_file(path: Option<&str>) -> Result<Config, String> {
+    pub fn from_file(path: Option<&Path>) -> Result<Config, String> {
         match path {
             Some(path) => {
                 let contents = std::fs::read_to_string(path)
@@ -280,8 +285,8 @@ mod config_test {
             .write_all(toml_content.as_bytes())
             .expect("Failed to write to temp file");
 
-        let config = Config::from_file(Some(temp_file.path().to_str().unwrap()))
-            .expect("Failed to parse config from file");
+        let config =
+            Config::from_file(Some(temp_file.path())).expect("Failed to parse config from file");
 
         assert_eq!(
             config
