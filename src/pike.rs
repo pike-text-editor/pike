@@ -20,6 +20,7 @@ impl Pike {
         mut config_file: Option<PathBuf>,
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
+        // TODO: figure out how to test this
         if config_file.is_none() && path::Path::new(config::DEFAULT_CONFIG_PATH).exists() {
             config_file = Some(PathBuf::from(config::DEFAULT_CONFIG_PATH));
         }
@@ -94,10 +95,59 @@ impl Pike {
 }
 
 #[cfg(test)]
-#[allow(clippy::assertions_on_constants)]
-mod test {
+mod pike_test {
+    use std::{env, path::PathBuf};
+
+    use crate::config::{Config, DEFAULT_CONFIG_PATH};
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    use super::Pike;
+
+    fn temp_file_with_contents(contents: &str) -> NamedTempFile {
+        let mut file = NamedTempFile::new().expect("Failed to create temp file");
+        file.write_all(contents.as_bytes())
+            .expect("Failed to write to temp file");
+        file
+    }
+
     #[test]
-    fn doesnt_fail() {
-        assert!(true)
+    fn test_build_minimal_args() {
+        let dir = env::temp_dir();
+        let cwd = PathBuf::from(dir.as_path());
+        let pike = Pike::build(cwd.clone(), None, None).expect("Failed to build Pike");
+
+        assert_eq!(pike.workspace.path, cwd);
+        assert!(pike.workspace.current_buffer.is_none());
+        assert!(pike.config == Config::default());
+    }
+
+    #[test]
+    fn test_build_max_args() {
+        let dir = env::temp_dir();
+        let config_content = r#"
+            [keymaps]
+            "ctrl+a" = "save"
+        "#;
+
+        let config_file = temp_file_with_contents(config_content);
+        let working_file = temp_file_with_contents("hello, world!");
+
+        let cwd = PathBuf::from(dir.as_path());
+        let cwf = Some(working_file.path().to_path_buf());
+        let config_path = Some(config_file.path().to_path_buf());
+
+        let pike = Pike::build(cwd.clone(), cwf, config_path).expect("Failed to build Pike");
+        assert_eq!(pike.workspace.path, cwd);
+        assert_eq!(
+            pike.workspace
+                .current_buffer
+                .expect("Current buffer shouldn't be empty when set")
+                .data(),
+            "hello, world!"
+        );
+        let expected_config =
+            Config::from_file(Some(config_file.path())).expect("Failed to load config from file");
+        assert_eq!(pike.config, expected_config);
     }
 }
