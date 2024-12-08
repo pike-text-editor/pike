@@ -21,12 +21,17 @@ pub struct App {
 #[allow(dead_code, unused_variables, unused_mut)]
 impl App {
     pub fn build(args: Args) -> App {
-        let cwd = std::env::current_dir().expect("Failed to get current working directory");
+        let cwd = std::env::current_dir().map_err(|_| "Failed to get current working directory");
+        if cwd.is_err() {
+            eprintln!("{}", cwd.err().unwrap());
+            std::process::exit(1);
+        }
 
         let config_path = args.config.map(PathBuf::from);
         let file_path = args.file.map(PathBuf::from);
 
-        let backend: Result<Pike, String> = Pike::build(cwd, file_path, config_path);
+        let backend: Result<Pike, String> =
+            Pike::build(cwd.expect("Error case was handled"), file_path, config_path);
 
         match backend {
             Ok(backend) => App::new(backend),
