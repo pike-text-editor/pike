@@ -3,6 +3,10 @@
 
 #### Maksym Bieńkowski, Jędrzej Grabski
 
+![Linux](https://github.com/pike-text-editor/pike/actions/workflows/linux-ci.yml/badge.svg)
+
+![Windows](https://github.com/pike-text-editor/pike/actions/workflows/windows-ci.yml/badge.svg)
+
 Branch zawiera szkielet kodu z ogólnymi, niewypełnionymi sygnaturami
 oraz definicjami obiektów. Szybki overview modułów:
 
