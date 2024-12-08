@@ -5,14 +5,15 @@ mod operations;
 mod pike;
 mod ui;
 
-use std::{env, io};
+use clap::Parser;
+use std::io;
 
-use app::App;
+use app::{App, Args};
 
 fn main() -> io::Result<()> {
-    let args: Vec<String> = env::args().collect();
+    let args = Args::parse();
     let mut terminal = ratatui::init();
-    let mut app = App::build(&args);
+    let mut app = App::build(args);
     app.run(&mut terminal)?;
 
     ratatui::restore();

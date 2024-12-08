@@ -1,5 +1,6 @@
-use std::io;
+use std::{io, path::PathBuf};
 
+use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -19,20 +20,13 @@ pub struct App {
 
 #[allow(dead_code, unused_variables, unused_mut)]
 impl App {
-    pub fn build(args: &[String]) -> App {
+    pub fn build(args: Args) -> App {
         let cwd = std::env::current_dir().expect("Failed to get current working directory");
 
-        let backend: Result<Pike, String> = match args.len() {
-            1 => Pike::new(cwd, None),
-            2 => {
-                let mut fpath = cwd.clone();
-                let fname = args[1].clone();
+        let config_path = args.config.map(PathBuf::from);
+        let file_path = args.file.map(PathBuf::from);
 
-                fpath.push(fname);
-                Pike::new(cwd, Some(fpath))
-            }
-            other => Err(format!("Usage: {} [path]", args[0])),
-        };
+        let backend: Result<Pike, String> = Pike::build(cwd, file_path, config_path);
 
         match backend {
             Ok(backend) => App::new(backend),
@@ -122,4 +116,15 @@ impl App {
     fn find_words_in_cwd() {
         todo!()
     }
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about=None)]
+pub struct Args {
+    /// The configuration file to use
+    #[arg(short, long, value_name = "FILE")]
+    config: Option<String>,
+
+    #[arg(value_name = "FILE")]
+    file: Option<String>,
 }
