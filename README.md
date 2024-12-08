@@ -4,7 +4,6 @@
 #### Maksym Bieńkowski, Jędrzej Grabski
 
 ![Linux](https://github.com/pike-text-editor/pike/actions/workflows/linux-ci.yaml/badge.svg)
-
 ![Windows](https://github.com/pike-text-editor/pike/actions/workflows/windows-ci.yaml/badge.svg)
 
 Branch zawiera szkielet kodu z ogólnymi, niewypełnionymi sygnaturami
