@@ -1,4 +1,4 @@
-use std::path::{self, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::config::Config;
@@ -20,9 +20,13 @@ impl Pike {
         mut config_file: Option<PathBuf>,
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
-        // TODO: figure out how to test this
-        if config_file.is_none() && path::Path::new(config::DEFAULT_CONFIG_PATH).exists() {
-            config_file = Some(PathBuf::from(config::DEFAULT_CONFIG_PATH));
+        let default_config_path = config::default_config_path();
+        if config_file.is_none() {
+            if let Ok(default_config_path) = default_config_path {
+                if default_config_path.exists() {
+                    config_file = Some(default_config_path.to_path_buf());
+                }
+            }
         }
 
         let mut workspace =
@@ -114,7 +118,9 @@ mod pike_test {
     #[test]
     fn test_build_minimal_args() {
         let dir = env::temp_dir();
-        let cwd = PathBuf::from(dir.as_path());
+        let cwd = PathBuf::from(dir.as_path())
+            .canonicalize()
+            .expect("Failed to canonicalize path");
         let pike = Pike::build(cwd.clone(), None, None).expect("Failed to build Pike");
 
         assert_eq!(pike.workspace.path, cwd);
@@ -133,7 +139,10 @@ mod pike_test {
         let config_file = temp_file_with_contents(config_content);
         let working_file = temp_file_with_contents("hello, world!");
 
-        let cwd = PathBuf::from(dir.as_path());
+        let cwd = PathBuf::from(dir.as_path())
+            .canonicalize()
+            .expect("Failed to canonicalize path");
+
         let cwf = Some(working_file.path().to_path_buf());
         let config_path = Some(config_file.path().to_path_buf());
 

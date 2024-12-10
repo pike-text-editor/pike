@@ -5,10 +5,21 @@ use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
 use std::{
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
-pub const DEFAULT_CONFIG_PATH: &str = "~/.config/pike.toml";
+/// Returns the default configuration path for pike regardless
+/// of OS
+pub fn default_config_path() -> Result<PathBuf, String> {
+    let config_dir = dirs::config_dir();
+    match config_dir {
+        Some(mut path) => {
+            path.push("pike.toml");
+            Ok(path)
+        }
+        None => Err("Failed to get the configuration directory".to_string()),
+    }
+}
 
 /// Editor configuration
 #[derive(Debug, PartialEq, Eq)]
@@ -300,5 +311,12 @@ mod config_test {
     fn test_from_file_no_path() {
         let config = Config::from_file(None).expect("Failed to parse config from file");
         assert_eq!(config, Config::default());
+    }
+
+    #[test]
+    fn test_default_config_path() {
+        let expected = dirs::config_dir().unwrap().join("pike.toml");
+        let actual = super::default_config_path().expect("Failed to get default config path");
+        assert_eq!(expected, actual);
     }
 }
