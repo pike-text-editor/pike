@@ -98,7 +98,7 @@ impl Pike {
 mod pike_test {
     use std::{env, path::PathBuf};
 
-    use crate::config::{Config, DEFAULT_CONFIG_PATH};
+    use crate::config::Config;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
