@@ -47,7 +47,7 @@ impl Pike {
 
     /// Open a file, move its contents into the current buffer
     /// and set the cursor to the offset
-    fn open_file(&mut self, path: &Path, offset: u32) {
+    pub fn open_file(&mut self, path: &Path, offset: u32) {
         todo!()
     }
 
@@ -115,13 +115,32 @@ mod pike_test {
         file
     }
 
-    #[test]
-    fn test_build_minimal_args() {
+    /// Setup before a test, creates an instance of pike in
+    /// a temporary directory and returns them. Optionally takes
+    /// in the string contents to be injected into its config and
+    /// current working files.
+    fn tmp_pike_and_working_dir(
+        config_content: Option<&str>,
+        cwf_content: Option<&str>,
+    ) -> (Pike, PathBuf) {
         let dir = env::temp_dir();
         let cwd = PathBuf::from(dir.as_path())
             .canonicalize()
             .expect("Failed to canonicalize path");
-        let pike = Pike::build(cwd.clone(), None, None).expect("Failed to build Pike");
+        let cwf = cwf_content.map(temp_file_with_contents);
+        let config_file = config_content.map(temp_file_with_contents);
+        let cwf_path = cwf.as_ref().map(|f| f.path().to_path_buf());
+        let config_path = config_file.as_ref().map(|f| f.path().to_path_buf());
+
+        (
+            Pike::build(cwd.clone(), cwf_path, config_path).expect("Failed to build Pike"),
+            cwd,
+        )
+    }
+
+    #[test]
+    fn test_build_minimal_args() {
+        let (pike, cwd) = tmp_pike_and_working_dir(None, None);
 
         assert_eq!(pike.workspace.path, cwd);
         assert!(pike.workspace.current_buffer.is_none());
@@ -130,23 +149,13 @@ mod pike_test {
 
     #[test]
     fn test_build_max_args() {
-        let dir = env::temp_dir();
         let config_content = r#"
             [keymaps]
             "ctrl+a" = "save"
         "#;
+        let file_content = "hello, world!";
+        let (pike, cwd) = tmp_pike_and_working_dir(Some(config_content), Some(file_content));
 
-        let config_file = temp_file_with_contents(config_content);
-        let working_file = temp_file_with_contents("hello, world!");
-
-        let cwd = PathBuf::from(dir.as_path())
-            .canonicalize()
-            .expect("Failed to canonicalize path");
-
-        let cwf = Some(working_file.path().to_path_buf());
-        let config_path = Some(config_file.path().to_path_buf());
-
-        let pike = Pike::build(cwd.clone(), cwf, config_path).expect("Failed to build Pike");
         assert_eq!(pike.workspace.path, cwd);
         assert_eq!(
             pike.workspace
@@ -156,7 +165,27 @@ mod pike_test {
             "hello, world!"
         );
         let expected_config =
-            Config::from_file(Some(config_file.path())).expect("Failed to load config from file");
+            Config::from_toml_representation(config_content).expect("Failed to parse config");
         assert_eq!(pike.config, expected_config);
+    }
+
+    #[test]
+    fn test_open_file_name_only() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0);
+        assert_eq!(
+            pike.workspace
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file"),
+            file.path()
+        );
+        assert_eq!(
+            pike.workspace
+                .current_buffer
+                .expect("Buffer should be set after opening a file")
+                .data(),
+            "Hello, world!"
+        );
     }
 }

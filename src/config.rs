@@ -30,7 +30,7 @@ pub struct Config {
 #[allow(dead_code)]
 impl Config {
     /// Creates a config instance based on toml string representation
-    fn from_toml_representation(s: &str) -> Result<Config, String> {
+    pub fn from_toml_representation(s: &str) -> Result<Config, String> {
         let mut return_value = Config::default();
 
         let parsed = s
