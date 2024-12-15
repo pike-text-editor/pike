@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::config::Config;
+use scribe::buffer::Position;
 use scribe::Workspace;
 
 /// Backend of the app
@@ -46,9 +47,21 @@ impl Pike {
     }
 
     /// Open a file, move its contents into the current buffer
-    /// and set the cursor to the offset
-    pub fn open_file(&mut self, path: &Path, offset: u32) {
-        todo!()
+    /// and set the cursor to the offset. If the offset is out of bounds,
+    /// the cursor will remain at the start of the file.
+    pub fn open_file(&mut self, path: &Path, line: usize, offset: usize) -> Result<(), String> {
+        self.workspace
+            .open_buffer(path)
+            .map_err(|_| "Error opening file".to_string())?;
+
+        self.workspace
+            .current_buffer
+            .as_mut()
+            .expect("Scribe's open_buffer should set a buffer")
+            .cursor
+            .move_to(Position { line, offset });
+
+        Ok(())
     }
 
     /// Create a new empty buffer and set it as the current buffer
@@ -103,6 +116,7 @@ mod pike_test {
     use std::{env, path::PathBuf};
 
     use crate::config::Config;
+    use scribe::buffer::Position;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -170,22 +184,78 @@ mod pike_test {
     }
 
     #[test]
-    fn test_open_file_name_only() {
+    fn test_open_zero_offset() {
         let file = temp_file_with_contents("Hello, world!");
         let mut pike = tmp_pike_and_working_dir(None, None).0;
-        pike.open_file(file.path(), 0);
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
         assert_eq!(
             pike.workspace
                 .current_buffer_path()
-                .expect("Buffer should be set after opening a file"),
-            file.path()
+                .expect("Buffer should be set after opening a file")
+                .file_name()
+                .expect("File should have a name"),
+            file.path().file_name().expect("File should have a name")
         );
+
         assert_eq!(
             pike.workspace
                 .current_buffer
                 .expect("Buffer should be set after opening a file")
                 .data(),
             "Hello, world!"
+        );
+    }
+
+    #[test]
+    fn test_open_file_non_zero_offset() {
+        let file_contents = r#"
+            Hello,
+            World
+            "#;
+        let file = temp_file_with_contents(file_contents);
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 1, 2)
+            .expect("Could not open file");
+
+        assert_eq!(
+            pike.workspace
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file")
+                .file_name()
+                .expect("File should have a name"),
+            file.path().file_name().expect("File should have a name")
+        );
+
+        assert_eq!(
+            pike.workspace
+                .current_buffer
+                .expect("Should have an open buffer!")
+                .cursor
+                .position,
+            Position { line: 1, offset: 2 }
+        );
+    }
+
+    #[test]
+    fn test_open_file_out_of_bounds_offset() {
+        let file_contents = r#"
+            Hello,
+            World
+            "#;
+        let file = temp_file_with_contents(file_contents);
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 2, 100)
+            .expect("Could not open file");
+
+        assert_eq!(
+            pike.workspace
+                .current_buffer
+                .expect("Should have an open buffer!")
+                .cursor
+                .position,
+            Position { line: 0, offset: 0 }
         );
     }
 }
