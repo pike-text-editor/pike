@@ -64,6 +64,17 @@ impl Pike {
         Ok(())
     }
 
+    /// Writes `text` to current buffer
+    fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
+        match &mut self.workspace.current_buffer {
+            Some(buffer) => {
+                buffer.insert(text);
+                Ok(())
+            }
+            None => Err("Trying to write to a non-existent buffer".to_string()),
+        }
+    }
+
     /// Create a new empty buffer and set it as the current buffer
     fn new_buffer(&mut self) {
         todo!()
@@ -256,6 +267,32 @@ mod pike_test {
                 .cursor
                 .position,
             Position { line: 0, offset: 0 }
+        );
+    }
+
+    #[test]
+    fn test_write_to_buffer() {
+        let mut pike = tmp_pike_and_working_dir(None, Some("")).0;
+        pike.write_to_current_buffer("Hello, world!")
+            .expect("Failed to write to buffer");
+
+        assert_eq!(
+            pike.workspace
+                .current_buffer
+                .expect("Should have an open buffer!")
+                .data(),
+            "Hello, world!"
+        );
+    }
+
+    #[test]
+    fn test_write_to_nonexisting_buffer() {
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        let result = pike.write_to_current_buffer("Hello, world!");
+
+        assert_eq!(
+            result,
+            Err("Trying to write to a non-existent buffer".to_string())
         );
     }
 }
