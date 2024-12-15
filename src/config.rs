@@ -3,7 +3,23 @@ use toml::Table;
 
 use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
+
+/// Returns the default configuration path for pike regardless
+/// of OS
+pub fn default_config_path() -> Result<PathBuf, String> {
+    let config_dir = dirs::config_dir();
+    match config_dir {
+        Some(mut path) => {
+            path.push("pike.toml");
+            Ok(path)
+        }
+        None => Err("Failed to get the configuration directory".to_string()),
+    }
+}
 
 /// Editor configuration
 #[derive(Debug, PartialEq, Eq)]
@@ -14,7 +30,7 @@ pub struct Config {
 #[allow(dead_code)]
 impl Config {
     /// Creates a config instance based on toml string representation
-    fn from_toml_representation(s: &str) -> Result<Config, String> {
+    pub fn from_toml_representation(s: &str) -> Result<Config, String> {
         let mut return_value = Config::default();
 
         let parsed = s
@@ -30,7 +46,7 @@ impl Config {
     }
 
     /// Loads the configuration from the config file and returns it
-    fn from_file(path: Option<&str>) -> Result<Config, String> {
+    pub fn from_file(path: Option<&Path>) -> Result<Config, String> {
         match path {
             Some(path) => {
                 let contents = std::fs::read_to_string(path)
@@ -280,8 +296,8 @@ mod config_test {
             .write_all(toml_content.as_bytes())
             .expect("Failed to write to temp file");
 
-        let config = Config::from_file(Some(temp_file.path().to_str().unwrap()))
-            .expect("Failed to parse config from file");
+        let config =
+            Config::from_file(Some(temp_file.path())).expect("Failed to parse config from file");
 
         assert_eq!(
             config
@@ -295,5 +311,12 @@ mod config_test {
     fn test_from_file_no_path() {
         let config = Config::from_file(None).expect("Failed to parse config from file");
         assert_eq!(config, Config::default());
+    }
+
+    #[test]
+    fn test_default_config_path() {
+        let expected = dirs::config_dir().unwrap().join("pike.toml");
+        let actual = super::default_config_path().expect("Failed to get default config path");
+        assert_eq!(expected, actual);
     }
 }
