@@ -102,8 +102,14 @@ impl Pike {
     }
 
     /// Save the current buffer to its file
-    fn save_current_buffer(&self) {
-        todo!()
+    fn save_current_buffer(&mut self) -> Result<(), String> {
+        match &mut self.workspace.current_buffer {
+            Some(buffer) => {
+                buffer.save().expect("Failed to save buffer");
+                Ok(())
+            }
+            None => Err("Trying to save a non-existent buffer".to_string()),
+        }
     }
 
     /// Undo the last change in the current buffer
@@ -293,6 +299,30 @@ mod pike_test {
         assert_eq!(
             result,
             Err("Trying to write to a non-existent buffer".to_string())
+        );
+    }
+
+    #[test]
+    fn test_save_current_buffer() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+        pike.save_current_buffer().expect("Failed to save buffer");
+
+        let contents = std::fs::read_to_string(file.path()).expect("Failed to read file");
+        assert_eq!(contents, "Hello, world!");
+    }
+
+    #[test]
+    fn test_save_nonexisting_buffer() {
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        let result = pike.save_current_buffer();
+
+        assert_eq!(
+            result,
+            Err("Trying to save a non-existent buffer".to_string())
         );
     }
 }
