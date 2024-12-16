@@ -141,3 +141,41 @@ pub struct Args {
     #[arg(value_name = "FILE")]
     file: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::test_util::temp_file_with_contents;
+
+    use super::App;
+
+    fn app_with_file(filename: String) -> super::App {
+        App::build(super::Args {
+            config: None,
+            file: Some(filename),
+        })
+    }
+
+    fn app_with_file_contents(contents: String) -> super::App {
+        let file = temp_file_with_contents(&contents);
+        let filename = file.path().to_str().unwrap().to_string();
+        app_with_file(filename)
+    }
+
+    #[test]
+    fn test_display_buffer_contents() {
+        let test_cases = [
+            "Hello, world!",
+            "Hello, world!\nThis is a test",
+            r#"Hello, world!
+            This is another test"#,
+            "",
+        ];
+
+        for case in test_cases.iter() {
+            let app = app_with_file_contents(case.to_string());
+            let buffer_contents = app.backend.current_buffer_contents();
+            assert_eq!(buffer_contents, *case);
+        }
+    }
+}

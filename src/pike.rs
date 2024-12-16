@@ -141,19 +141,10 @@ impl Pike {
 mod pike_test {
     use std::{env, path::PathBuf};
 
-    use crate::config::Config;
+    use crate::{config::Config, test_util::temp_file_with_contents};
     use scribe::buffer::Position;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
 
     use super::Pike;
-
-    fn temp_file_with_contents(contents: &str) -> NamedTempFile {
-        let mut file = NamedTempFile::new().expect("Failed to create temp file");
-        file.write_all(contents.as_bytes())
-            .expect("Failed to write to temp file");
-        file
-    }
 
     /// Setup before a test, creates an instance of pike in
     /// a temporary directory and returns them. Optionally takes
