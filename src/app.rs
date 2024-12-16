@@ -1,5 +1,6 @@
-use std::io;
+use std::{io, path::PathBuf};
 
+use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
     layout::{self, Constraint, Direction, Layout},
@@ -8,15 +9,46 @@ use ratatui::{
     Terminal,
 };
 
+use crate::pike::Pike;
+
 /// TUI application which displays the UI and handles events
 #[allow(dead_code)]
-#[derive(Default)]
 pub struct App {
     exit: bool,
+    backend: Pike,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
 impl App {
+    pub fn build(args: Args) -> App {
+        let cwd = std::env::current_dir().map_err(|_| "Failed to get current working directory");
+        if cwd.is_err() {
+            eprintln!("{}", cwd.err().unwrap());
+            std::process::exit(1);
+        }
+
+        let config_path = args.config.map(PathBuf::from);
+        let file_path = args.file.map(PathBuf::from);
+
+        let backend: Result<Pike, String> =
+            Pike::build(cwd.expect("Error case was handled"), file_path, config_path);
+
+        match backend {
+            Ok(backend) => App::new(backend),
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    fn new(backend: Pike) -> App {
+        App {
+            exit: false,
+            backend,
+        }
+    }
+
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         loop {
             if self.exit {
@@ -94,4 +126,15 @@ impl App {
     fn find_words_in_cwd() {
         todo!()
     }
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about=None)]
+pub struct Args {
+    /// The configuration file to use
+    #[arg(short, long, value_name = "FILE")]
+    config: Option<String>,
+
+    #[arg(value_name = "FILE")]
+    file: Option<String>,
 }
