@@ -5,7 +5,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
     layout::{self, Constraint, Direction, Layout},
     prelude::Backend,
-    widgets::Block,
+    text::Text,
     Terminal,
 };
 
@@ -65,13 +65,14 @@ impl App {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(1)]);
         let main_area = layout.split(frame.area())[0];
-        let block = Block::default().title("Hello pike");
-        frame.render_widget(block, main_area);
+        self.render_buffer_contents(main_area, frame);
     }
 
     /// Render the contents of the currently opened buffer in a given area
-    fn render_buffer_contents(self, area: &mut layout::Rect, frame: &mut ratatui::Frame) {
-        todo!()
+    fn render_buffer_contents(&self, area: layout::Rect, frame: &mut ratatui::Frame) {
+        let contents = self.backend.current_buffer_contents();
+        let text_widget = Text::from(contents);
+        frame.render_widget(text_widget, area);
     }
 
     fn handle_events(&mut self) -> io::Result<()> {

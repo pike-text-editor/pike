@@ -75,6 +75,15 @@ impl Pike {
         }
     }
 
+    /// Returns the contents of the currently opened buffer or
+    /// an empty string if none is open
+    pub fn current_buffer_contents(&self) -> String {
+        match self.workspace.current_buffer.as_ref() {
+            Some(buffer) => buffer.data(),
+            None => String::from(""),
+        }
+    }
+
     /// Create a new empty buffer and set it as the current buffer
     fn new_buffer(&mut self) {
         todo!()
@@ -324,5 +333,22 @@ mod pike_test {
             result,
             Err("Trying to save a non-existent buffer".to_string())
         );
+    }
+
+    #[test]
+    fn test_current_buffer_contents_has_buffer() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+    }
+
+    #[test]
+    fn test_current_buffer_contents_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert_eq!(pike.current_buffer_contents(), "");
     }
 }
