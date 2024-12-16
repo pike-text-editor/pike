@@ -2,7 +2,7 @@ use std::io;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{self, Constraint, Direction, Layout},
     prelude::Backend,
     widgets::Block,
     Terminal,
@@ -32,9 +32,14 @@ impl App {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(1)]);
-        let area = layout.split(frame.area())[0];
+        let main_area = layout.split(frame.area())[0];
         let block = Block::default().title("Hello pike");
-        frame.render_widget(block, area);
+        frame.render_widget(block, main_area);
+    }
+
+    /// Render the contents of the currently opened buffer in a given area
+    fn render_buffer_contents(self, area: &mut layout::Rect, frame: &mut ratatui::Frame) {
+        todo!()
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
