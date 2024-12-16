@@ -69,7 +69,7 @@ impl App {
         self.render_buffer_contents(main_area, frame);
     }
 
-    /// Render the contents of the currently opened buffer in a given area
+    /// Render the contents of the currently opened buffer in a given Rect
     fn render_buffer_contents(&self, area: layout::Rect, frame: &mut ratatui::Frame) {
         let contents = self.backend.current_buffer_contents();
         let text_widget = Text::from(contents);
@@ -149,6 +149,7 @@ mod tests {
 
     use super::App;
 
+    /// Create an App instance with a given file open
     fn app_with_file(filename: String) -> super::App {
         App::build(super::Args {
             config: None,
@@ -156,6 +157,7 @@ mod tests {
         })
     }
 
+    /// Create an App instance with a file containing the given contents open
     fn app_with_file_contents(contents: String) -> super::App {
         let file = temp_file_with_contents(&contents);
         let filename = file.path().to_str().unwrap().to_string();
