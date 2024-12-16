@@ -6,6 +6,7 @@ use ratatui::{
     layout::{self, Constraint, Direction, Layout},
     prelude::Backend,
     text::Text,
+    widgets::{Paragraph, Wrap},
     Terminal,
 };
 
@@ -72,7 +73,8 @@ impl App {
     fn render_buffer_contents(&self, area: layout::Rect, frame: &mut ratatui::Frame) {
         let contents = self.backend.current_buffer_contents();
         let text_widget = Text::from(contents);
-        frame.render_widget(text_widget, area);
+        let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
+        frame.render_widget(paragraph_widget, area);
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
