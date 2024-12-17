@@ -6,7 +6,7 @@ use ratatui::{
     layout::{self, Constraint, Direction, Layout},
     prelude::Backend,
     text::Text,
-    widgets::{Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Widget, Wrap},
     Terminal,
 };
 
@@ -17,6 +17,18 @@ use crate::pike::Pike;
 pub struct App {
     exit: bool,
     backend: Pike,
+}
+
+impl Widget for &App {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Max(2)]);
+        let main_area = layout.split(area)[0];
+        let status_bar_area = layout.split(area)[1];
+        self.render_buffer_contents(main_area, buf);
+        self.render_status_bar(status_bar_area, buf);
+    }
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -62,19 +74,28 @@ impl App {
     }
 
     fn draw(&self, frame: &mut ratatui::Frame) {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1)]);
-        let main_area = layout.split(frame.area())[0];
-        self.render_buffer_contents(main_area, frame);
+        frame.render_widget(self, frame.area());
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
-    fn render_buffer_contents(&self, area: layout::Rect, frame: &mut ratatui::Frame) {
+    fn render_buffer_contents(&self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
         let contents = self.backend.current_buffer_contents();
         let text_widget = Text::from(contents);
         let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
-        frame.render_widget(paragraph_widget, area);
+        paragraph_widget.render(area, buf);
+    }
+
+    /// Render the status bar in a given Rect
+    fn render_status_bar(&self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
+        // TODO: come back to this when text insertion is implemented to display saved/unsaved
+        // changes info
+        let filename = self.backend.current_buffer_filename();
+        let text_widget = Text::from(filename);
+
+        let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
+        let block_widget = paragraph_widget.block(Block::default().borders(Borders::TOP));
+
+        block_widget.render(area, buf);
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -145,6 +166,9 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
 
+    use ratatui::{buffer::Buffer, layout::Rect};
+    use tempfile::NamedTempFile;
+
     use crate::test_util::temp_file_with_contents;
 
     use super::App;
@@ -164,6 +188,11 @@ mod tests {
         app_with_file(filename)
     }
 
+    /// Return a string representation of a solid border of a given length.
+    fn solid_border(length: usize) -> String {
+        "─".repeat(length)
+    }
+
     #[test]
     fn test_display_buffer_contents() {
         let test_cases = [
@@ -179,5 +208,19 @@ mod tests {
             let buffer_contents = app.backend.current_buffer_contents();
             assert_eq!(buffer_contents, *case);
         }
+    }
+
+    #[test]
+    fn test_render_status_bar() {
+        let file = NamedTempFile::new().expect("Failed to create temporary file");
+        let file_path = file.path().to_str().unwrap().to_string();
+        let filename = file.path().file_name().unwrap().to_str().unwrap();
+        let app = app_with_file(file_path.clone());
+        let width = 20;
+
+        let mut buf = Buffer::empty(Rect::new(0, 0, width, 2));
+        let expected = Buffer::with_lines(vec![solid_border(width.into()), filename.to_string()]);
+        app.render_status_bar(buf.area, &mut buf);
+        assert_eq!(buf, expected)
     }
 }

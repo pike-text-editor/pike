@@ -84,6 +84,24 @@ impl Pike {
         }
     }
 
+    /// Returns the filename of the current buffer or an empty string
+    pub fn current_buffer_filename(&self) -> String {
+        match self.workspace.current_buffer_path() {
+            // TODO: check this goofy ahh chain
+            Some(path) => path.file_name().unwrap().to_str().unwrap().to_string(),
+            None => String::from(""),
+        }
+    }
+
+    /// Returns whether the current buffer has unsaved changes or
+    /// false if it's empty
+    pub fn has_unsaved_changes(&self) -> bool {
+        match &self.workspace.current_buffer {
+            Some(buffer) => buffer.modified(),
+            None => false,
+        }
+    }
+
     /// Create a new empty buffer and set it as the current buffer
     fn new_buffer(&mut self) {
         todo!()
@@ -341,5 +359,54 @@ mod pike_test {
         let pike = tmp_pike_and_working_dir(None, None).0;
 
         assert_eq!(pike.current_buffer_contents(), "");
+    }
+
+    #[test]
+    fn test_current_buffer_fname_has_buffer() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        assert_eq!(
+            pike.current_buffer_filename(),
+            file.path().file_name().unwrap().to_str().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_current_buffer_fname_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert_eq!(pike.current_buffer_filename(), "");
+    }
+
+    #[test]
+    fn test_has_unsaved_changes_has_changes() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+        pike.write_to_current_buffer("belo")
+            .expect("Failed to write to file");
+
+        assert!(pike.has_unsaved_changes());
+    }
+
+    #[test]
+    fn test_has_unsaved_changes_no_changes() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        assert!(!pike.has_unsaved_changes());
+    }
+
+    #[test]
+    fn test_has_unsaved_changes_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert!(!pike.has_unsaved_changes());
     }
 }
