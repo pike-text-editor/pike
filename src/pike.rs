@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::config;
 use crate::config::Config;
 use scribe::buffer::Position;
-use scribe::Workspace;
+use scribe::{Buffer, Workspace};
 
 /// Backend of the app
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -78,15 +78,19 @@ impl Pike {
     /// Returns the contents of the currently opened buffer or
     /// an empty string if none is open
     pub fn current_buffer_contents(&self) -> String {
-        match self.workspace.current_buffer.as_ref() {
+        match self.current_buffer().as_ref() {
             Some(buffer) => buffer.data(),
             None => String::from(""),
         }
     }
 
+    pub fn current_buffer_path(&self) -> Option<&Path> {
+        self.workspace.current_buffer_path()
+    }
+
     /// Returns the filename of the current buffer or an empty string
     pub fn current_buffer_filename(&self) -> String {
-        match self.workspace.current_buffer_path() {
+        match self.current_buffer_path() {
             // TODO: check this goofy ahh chain
             Some(path) => path.file_name().unwrap().to_str().unwrap().to_string(),
             None => String::from(""),
@@ -96,7 +100,7 @@ impl Pike {
     /// Returns whether the current buffer has unsaved changes or
     /// false if it's empty
     pub fn has_unsaved_changes(&self) -> bool {
-        match &self.workspace.current_buffer {
+        match &self.current_buffer() {
             Some(buffer) => buffer.modified(),
             None => false,
         }
@@ -109,6 +113,11 @@ impl Pike {
             .current_buffer
             .as_ref()
             .map(|buffer| buffer.cursor.position)
+    }
+
+    /// Getter for the current buffer
+    pub fn current_buffer(&self) -> Option<&Buffer> {
+        self.workspace.current_buffer.as_ref()
     }
 
     /// Create a new empty buffer and set it as the current buffer
@@ -201,7 +210,7 @@ mod pike_test {
         let (pike, cwd) = tmp_pike_and_working_dir(None, None);
 
         assert_eq!(pike.workspace.path, cwd);
-        assert!(pike.workspace.current_buffer.is_none());
+        assert!(pike.current_buffer().is_none());
         assert!(pike.config == Config::default());
     }
 
