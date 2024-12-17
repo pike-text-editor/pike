@@ -6,7 +6,7 @@ use ratatui::{
     layout::{self, Constraint, Direction, Layout},
     prelude::Backend,
     text::Text,
-    widgets::{Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Terminal,
 };
 
@@ -64,9 +64,11 @@ impl App {
     fn draw(&self, frame: &mut ratatui::Frame) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1)]);
+            .constraints([Constraint::Min(1), Constraint::Max(2)]);
         let main_area = layout.split(frame.area())[0];
+        let status_bar_area = layout.split(frame.area())[1];
         self.render_buffer_contents(main_area, frame);
+        self.render_status_bar(status_bar_area, frame);
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
@@ -75,6 +77,19 @@ impl App {
         let text_widget = Text::from(contents);
         let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
         frame.render_widget(paragraph_widget, area);
+    }
+
+    /// Render the status bar in a given Rect
+    fn render_status_bar(&self, area: layout::Rect, frame: &mut ratatui::Frame) {
+        // TODO: come back to this when text insertion is implemented to display saved/unsaved
+        // changes info
+        let filename = self.backend.current_buffer_filename();
+        let text_widget = Text::from(filename);
+
+        let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
+        let block_widget = paragraph_widget.block(Block::default().borders(Borders::TOP));
+
+        frame.render_widget(block_widget, area);
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
