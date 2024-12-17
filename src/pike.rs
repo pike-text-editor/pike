@@ -120,6 +120,34 @@ impl Pike {
         self.workspace.current_buffer.as_ref()
     }
 
+    /// Move the cursor up if possible, else do nothing
+    pub fn move_cursor_up(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_up();
+        }
+    }
+
+    /// Move the cursor down if possible, else do nothing
+    pub fn move_cursor_down(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_down();
+        }
+    }
+
+    /// Move the cursor left if possible, else do nothing
+    pub fn move_cursor_left(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_left();
+        }
+    }
+
+    /// Move the cursor right if possible, else do nothing
+    pub fn move_cursor_right(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_right();
+        }
+    }
+
     /// Create a new empty buffer and set it as the current buffer
     fn new_buffer(&mut self) {
         todo!()
