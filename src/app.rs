@@ -166,6 +166,9 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
 
+    use ratatui::{buffer::Buffer, layout::Rect};
+    use tempfile::NamedTempFile;
+
     use crate::test_util::temp_file_with_contents;
 
     use super::App;
@@ -185,6 +188,11 @@ mod tests {
         app_with_file(filename)
     }
 
+    /// Return a string representation of a solid border of a given length.
+    fn solid_border(length: usize) -> String {
+        "─".repeat(length)
+    }
+
     #[test]
     fn test_display_buffer_contents() {
         let test_cases = [
@@ -200,5 +208,19 @@ mod tests {
             let buffer_contents = app.backend.current_buffer_contents();
             assert_eq!(buffer_contents, *case);
         }
+    }
+
+    #[test]
+    fn test_render_status_bar() {
+        let file = NamedTempFile::new().expect("Failed to create temporary file");
+        let file_path = file.path().to_str().unwrap().to_string();
+        let filename = file.path().file_name().unwrap().to_str().unwrap();
+        let app = app_with_file(file_path.clone());
+        let width = 20;
+
+        let mut buf = Buffer::empty(Rect::new(0, 0, width, 2));
+        let expected = Buffer::with_lines(vec![solid_border(width.into()), filename.to_string()]);
+        app.render_status_bar(buf.area, &mut buf);
+        assert_eq!(buf, expected)
     }
 }
