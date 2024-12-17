@@ -182,8 +182,8 @@ mod tests {
     }
 
     /// Create an App instance with a file containing the given contents open
-    fn app_with_file_contents(contents: String) -> super::App {
-        let file = temp_file_with_contents(&contents);
+    fn app_with_file_contents(contents: &str) -> super::App {
+        let file = temp_file_with_contents(contents);
         let filename = file.path().to_str().unwrap().to_string();
         app_with_file(filename)
     }
@@ -193,21 +193,38 @@ mod tests {
         "─".repeat(length)
     }
 
-    #[test]
-    fn test_display_buffer_contents() {
-        let test_cases = [
-            "Hello, world!",
-            "Hello, world!\nThis is a test",
-            r#"Hello, world!
-            This is another test"#,
-            "",
-        ];
+    /// Return a string representation of a line filled with
+    /// spaces of a given length
+    fn n_spaces(n: usize) -> String {
+        String::from(" ").repeat(n)
+    }
 
-        for case in test_cases.iter() {
-            let app = app_with_file_contents(case.to_string());
-            let buffer_contents = app.backend.current_buffer_contents();
-            assert_eq!(buffer_contents, *case);
-        }
+    #[test]
+    fn test_render_buffer_contents_no_wrap() {
+        let contents = String::from("Hello, world!");
+        let app = app_with_file_contents(&contents);
+        let width = 15;
+
+        let mut buf = Buffer::empty(Rect::new(0, 0, width, 2));
+        let expected = Buffer::with_lines(vec![contents, n_spaces(width.into())]);
+        app.render_buffer_contents(buf.area, &mut buf);
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn test_render_buffer_contents_wraps() {
+        let contents = "Hello, world!";
+        let app = app_with_file_contents(contents);
+        let width = 5;
+        let mut buf = Buffer::empty(Rect::new(0, 0, width, 4));
+        let expected = Buffer::with_lines(vec![
+            "Hello".to_string(),
+            ",".to_string(),
+            "world".to_string(),
+            "!".to_string(),
+        ]);
+        app.render_buffer_contents(buf.area, &mut buf);
+        assert_eq!(buf, expected);
     }
 
     #[test]
