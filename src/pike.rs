@@ -102,6 +102,15 @@ impl Pike {
         }
     }
 
+    /// Returns the position of the cursor in the current buffer
+    /// or None if there isn't one
+    pub fn cursor_position(&self) -> Option<Position> {
+        self.workspace
+            .current_buffer
+            .as_ref()
+            .map(|buffer| buffer.cursor.position)
+    }
+
     /// Create a new empty buffer and set it as the current buffer
     fn new_buffer(&mut self) {
         todo!()
