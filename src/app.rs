@@ -81,7 +81,7 @@ impl App {
     fn render_buffer_contents(&self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
         let contents = self.backend.current_buffer_contents();
         let text_widget = Text::from(contents);
-        let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
+        let paragraph_widget = Paragraph::new(text_widget);
         paragraph_widget.render(area, buf);
     }
 
@@ -200,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn test_render_buffer_contents_no_wrap() {
+    fn test_render_buffer_contents_fit() {
         let contents = String::from("Hello, world!");
         let app = app_with_file_contents(&contents);
         let width = 15;
@@ -212,17 +212,12 @@ mod tests {
     }
 
     #[test]
-    fn test_render_buffer_contents_wraps() {
+    fn test_render_buffer_contents_too_long() {
         let contents = "Hello, world!";
         let app = app_with_file_contents(contents);
-        let width = 5;
-        let mut buf = Buffer::empty(Rect::new(0, 0, width, 4));
-        let expected = Buffer::with_lines(vec![
-            "Hello".to_string(),
-            ",".to_string(),
-            "world".to_string(),
-            "!".to_string(),
-        ]);
+        let width = 4;
+        let mut buf = Buffer::empty(Rect::new(0, 0, width, 1));
+        let expected = Buffer::with_lines(vec!["Hell".to_string()]);
         app.render_buffer_contents(buf.area, &mut buf);
         assert_eq!(buf, expected);
     }
