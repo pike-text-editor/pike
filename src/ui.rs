@@ -85,11 +85,30 @@ impl BufferDisplay<'_> {
         }
     }
 
+    /// Updates the y offset of the buffer so that the cursor is always visible
+    fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
+        let cursor_y = self
+            .cursor_position
+            .unwrap_or(&Position { line: 0, offset: 0 })
+            .line;
+        if cursor_y as u16 >= area.height {
+            self.offset.y = cursor_y - area.height as usize + 1;
+        }
+    }
+
+    fn shift_contents_down(self, contents: String) -> String {
+        contents
+            .lines()
+            .skip(self.offset.y)
+            .collect::<Vec<&str>>()
+            .join("\n")
+    }
+
     /// Shifts the content of the buffer to the right by the offset and returns the resulting
     /// string. Basically, takes every line and removes line[0:self.offset.x] from it, then
     /// joins and returns them.
-    fn shift_content_right(self) -> String {
-        self.buffer_contents
+    fn shift_contents_right(&mut self, contents: String) -> String {
+        contents
             .lines()
             .map(|line| {
                 let line = line.chars().skip(self.offset.x).collect::<String>();
@@ -103,8 +122,11 @@ impl BufferDisplay<'_> {
 impl Widget for BufferDisplay<'_> {
     fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         self.update_x_offset(area);
-        let contents = self.shift_content_right();
-        let text_widget = Text::from(contents);
+        self.update_y_offset(area);
+        let contents_shifted_right = self.shift_contents_right(self.buffer_contents.to_string());
+        let contents_shifted_down = self.shift_contents_down(contents_shifted_right);
+
+        let text_widget = Text::from(contents_shifted_down);
         let paragraph_widget = Paragraph::new(text_widget);
         paragraph_widget.render(area, buf);
     }

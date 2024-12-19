@@ -347,4 +347,20 @@ mod tests {
         app.backend.move_cursor_right();
         assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["3", "6"]);
     }
+
+    /// The buffer contents should shift down so that lines that
+    /// are too long to render can be inspected by moving further down.
+    #[test]
+    fn test_buffer_shifts_when_moving_outside_visible_lines() {
+        let mut app = app_with_file_contents("123\n456\n789");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 3, 1));
+
+        // Verify initial buffer rendering after the first cursor move.
+        app.backend.move_cursor_down();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456"]);
+
+        // Verify buffer rendering after the second cursor move.
+        app.backend.move_cursor_down();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["789"]);
+    }
 }
