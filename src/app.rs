@@ -1,9 +1,9 @@
-use std::{io, path::PathBuf};
+use std::{cmp::min, io, path::PathBuf};
 
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
-    layout::{self, Constraint, Direction, Layout},
+    layout::{self, Constraint, Direction, Layout, Position},
     prelude::Backend,
     text::Text,
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
@@ -17,18 +17,6 @@ use crate::pike::Pike;
 pub struct App {
     exit: bool,
     backend: Pike,
-}
-
-impl Widget for &App {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Max(2)]);
-        let main_area = layout.split(area)[0];
-        let status_bar_area = layout.split(area)[1];
-        self.render_buffer_contents(main_area, buf);
-        self.render_status_bar(status_bar_area, buf);
-    }
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -73,8 +61,16 @@ impl App {
         }
     }
 
-    fn draw(&self, frame: &mut ratatui::Frame) {
-        frame.render_widget(self, frame.area());
+    fn draw(&mut self, frame: &mut ratatui::Frame) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Max(2)]);
+        let area = frame.area();
+        let main_area = layout.split(area)[0];
+        let status_bar_area = layout.split(area)[1];
+        // self.render_buffer_contents(main_area, frame.buffer_mut());
+        self.render_status_bar(status_bar_area, frame.buffer_mut());
+        self.render_cursor(main_area, frame);
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
@@ -96,6 +92,31 @@ impl App {
         let block_widget = paragraph_widget.block(Block::default().borders(Borders::TOP));
 
         block_widget.render(area, buf);
+    }
+
+    /// Renders the cursor in the current buffer
+    fn render_cursor(&self, area: layout::Rect, frame: &mut ratatui::prelude::Frame) {
+        if let Some(position) = self.backend.cursor_position() {
+            let cursor_position = self.get_cursor_render_position(area);
+            frame.set_cursor_position(cursor_position);
+        }
+    }
+
+    /// Get the position to render the cursor at in the current buffer.
+    /// Subject to changing when handling more input scenarios, only works
+    /// when editing the current buffer
+    fn get_cursor_render_position(&self, area: layout::Rect) -> Position {
+        let width = area.width;
+        let height = area.height;
+        let base_x = area.x;
+        let base_y = area.y;
+
+        let position = self.backend.cursor_position().unwrap_or_default();
+
+        Position {
+            x: min(base_x + position.offset as u16, width),
+            y: min(base_y + position.line as u16, height - 1),
+        }
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -127,6 +148,22 @@ impl App {
         match key.code {
             KeyCode::Char('q') => {
                 self.exit();
+                Ok(())
+            }
+            KeyCode::Left => {
+                self.backend.move_cursor_left();
+                Ok(())
+            }
+            KeyCode::Right => {
+                self.backend.move_cursor_right();
+                Ok(())
+            }
+            KeyCode::Up => {
+                self.backend.move_cursor_up();
+                Ok(())
+            }
+            KeyCode::Down => {
+                self.backend.move_cursor_down();
                 Ok(())
             }
             _ => Ok(()),
