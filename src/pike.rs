@@ -148,6 +148,19 @@ impl Pike {
         }
     }
 
+    /// Returns the length of the current line
+    pub fn current_line_length(&self) -> usize {
+        let current_line_number = self.cursor_position().map_or(0, |pos| pos.line);
+        match self
+            .current_buffer_contents()
+            .lines()
+            .nth(current_line_number)
+        {
+            Some(line) => line.len(),
+            None => 0,
+        }
+    }
+
     /// Create a new empty buffer and set it as the current buffer
     fn new_buffer(&mut self) {
         todo!()
@@ -479,10 +492,19 @@ mod pike_test {
     /// buffer
     #[test]
     fn test_move_cursor_out_of_bounds() {
-        let contents = "";
+        let contents = "a";
         let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
 
         pike.move_cursor_right();
+        assert_eq!(
+            pike.cursor_position(),
+            // This makes sense, since inserting does not move the cursor right
+            Some(Position { line: 0, offset: 1 })
+        );
+
+        // Two times to the left to test for going too far to the left
+        pike.move_cursor_left();
+        pike.move_cursor_left();
         assert_eq!(
             pike.cursor_position(),
             Some(Position { line: 0, offset: 0 })
@@ -494,16 +516,28 @@ mod pike_test {
             Some(Position { line: 0, offset: 0 })
         );
 
-        pike.move_cursor_left();
-        assert_eq!(
-            pike.cursor_position(),
-            Some(Position { line: 0, offset: 0 })
-        );
-
         pike.move_cursor_up();
         assert_eq!(
             pike.cursor_position(),
             Some(Position { line: 0, offset: 0 })
         );
+    }
+
+    #[test]
+    fn test_current_line_length_buffer_exists() {
+        let contents = ["Hello!", ""].join("\n");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents.as_str()));
+
+        assert_eq!(pike.current_line_length(), 6);
+
+        pike.move_cursor_down();
+        assert_eq!(pike.current_line_length(), 0);
+    }
+
+    #[test]
+    fn test_current_line_length_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert_eq!(pike.current_line_length(), 0);
     }
 }

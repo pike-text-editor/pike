@@ -103,7 +103,7 @@ impl App {
     /// Renders the cursor in the current buffer
     fn render_cursor(&self, area: layout::Rect, frame: &mut ratatui::prelude::Frame) {
         if let Some(position) = self.backend.cursor_position() {
-            let cursor_position = self.get_cursor_render_position(area);
+            let cursor_position = self.calculate_cursor_render_position(area);
             frame.set_cursor_position(cursor_position);
         }
     }
@@ -111,17 +111,27 @@ impl App {
     /// Get the position to render the cursor at in the current buffer.
     /// Subject to changing when handling more input scenarios, only works
     /// when editing the current buffer
-    fn get_cursor_render_position(&self, area: layout::Rect) -> Position {
-        let width = area.width;
-        let height = area.height;
-        let base_x = area.x;
-        let base_y = area.y;
+    pub fn calculate_cursor_render_position(&self, area: layout::Rect) -> Position {
+        let (max_x, max_y) = (area.width - 1, area.height - 1);
+        let (base_x, base_y) = (area.x, area.y);
 
-        let position = self.backend.cursor_position().unwrap_or_default();
+        let cursor_position = self.backend.cursor_position().unwrap_or_default();
 
         Position {
-            x: min(base_x + position.offset as u16, width),
-            y: min(base_y + position.line as u16, height - 1),
+            x: min(base_x + cursor_position.offset as u16, max_x),
+            y: min(base_y + cursor_position.line as u16, max_y),
+        }
+    }
+
+    /// Try to move the cursor to the right unless it's at the
+    /// last character in the line. It's possible to do it in the
+    /// backend, but makes no sense unless inserting text
+    fn try_move_cursor_right(&mut self) {
+        if let Some(pos) = self.backend.cursor_position() {
+            let max_offset = self.backend.current_line_length() - 1;
+            if pos.offset < max_offset {
+                self.backend.move_cursor_right();
+            }
         }
     }
 
@@ -161,7 +171,7 @@ impl App {
                 Ok(())
             }
             KeyCode::Right => {
-                self.backend.move_cursor_right();
+                self.try_move_cursor_right();
                 Ok(())
             }
             KeyCode::Up => {
@@ -278,5 +288,24 @@ mod tests {
         let expected = Buffer::with_lines(vec![solid_border(width.into()), filename.to_string()]);
         app.render_status_bar(buf.area, &mut buf);
         assert_eq!(buf, expected)
+    }
+
+    /// The cursor should not move past the bounds of the buffer
+    #[test]
+    fn test_cant_move_cursor_too_far_right() {
+        let mut app = app_with_file_contents("t");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 1));
+
+        // Starts at (0, 0)
+        let pos = app.calculate_cursor_render_position(buf.area);
+        assert_eq!(pos, (0, 0).into());
+
+        app.try_move_cursor_right();
+        let pos = app.calculate_cursor_render_position(buf.area);
+        assert_eq!(pos, (0, 0).into());
+
+        app.try_move_cursor_right();
+        let pos = app.calculate_cursor_render_position(buf.area);
+        assert_eq!(pos, (0, 0).into());
     }
 }
