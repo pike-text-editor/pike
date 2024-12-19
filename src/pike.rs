@@ -474,4 +474,36 @@ mod pike_test {
             Some(Position { line: 1, offset: 0 })
         );
     }
+
+    /// The cursor should not move out of the bounds of the current
+    /// buffer
+    #[test]
+    fn test_move_cursor_out_of_bounds() {
+        let contents = "";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_right();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+
+        pike.move_cursor_down();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+
+        pike.move_cursor_left();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+
+        pike.move_cursor_up();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+    }
 }
