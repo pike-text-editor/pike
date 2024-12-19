@@ -10,13 +10,17 @@ use ratatui::{
     Terminal,
 };
 
-use crate::pike::Pike;
+use crate::{
+    pike::Pike,
+    ui::{BufferDisplay, UIState},
+};
 
 /// TUI application which displays the UI and handles events
 #[allow(dead_code)]
 pub struct App {
     exit: bool,
     backend: Pike,
+    ui_state: UIState,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -47,6 +51,7 @@ impl App {
         App {
             exit: false,
             backend,
+            ui_state: UIState::default(),
         }
     }
 
@@ -68,17 +73,18 @@ impl App {
         let area = frame.area();
         let main_area = layout.split(area)[0];
         let status_bar_area = layout.split(area)[1];
-        // self.render_buffer_contents(main_area, frame.buffer_mut());
+        self.render_buffer_contents(main_area, frame.buffer_mut());
         self.render_status_bar(status_bar_area, frame.buffer_mut());
         self.render_cursor(main_area, frame);
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
     fn render_buffer_contents(&self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let contents = self.backend.current_buffer_contents();
-        let text_widget = Text::from(contents);
-        let paragraph_widget = Paragraph::new(text_widget);
-        paragraph_widget.render(area, buf);
+        let buffer_contents = &self.backend.current_buffer_contents();
+        let cursor_position = self.backend.cursor_position();
+        let offset = &self.ui_state.buffer_offset;
+        let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
+        buffer_widget.render(area, buf);
     }
 
     /// Render the status bar in a given Rect
