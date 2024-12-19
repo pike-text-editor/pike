@@ -455,4 +455,23 @@ mod pike_test {
 
         assert!(!pike.has_unsaved_changes());
     }
+
+    /// When moving down to a shorter line, the
+    /// cursor position should be clamped to its length
+    #[test]
+    fn test_move_cursor_down_shorter_line() {
+        let contents = r#"Hello!
+
+        This is a test."#;
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+        for _ in 0..5 {
+            pike.move_cursor_right();
+        }
+
+        pike.move_cursor_down();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 1, offset: 0 })
+        );
+    }
 }
