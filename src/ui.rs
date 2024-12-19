@@ -55,14 +55,15 @@ pub struct BufferDisplay<'a> {
     /// Current position of the cursor in the buffer
     cursor_position: Option<&'a Position>,
     /// Offset of the buffer being rendered
-    offset: &'a BufferDisplayOffset,
+    offset: &'a mut BufferDisplayOffset,
 }
 
+// TODO: think about refactoring to a stateful widget
 impl BufferDisplay<'_> {
     pub fn new<'a>(
         buffer_contents: &'a str,
         cursor_position: Option<&'a Position>,
-        offset: &'a BufferDisplayOffset,
+        offset: &'a mut BufferDisplayOffset,
     ) -> BufferDisplay<'a> {
         BufferDisplay {
             buffer_contents,
@@ -70,11 +71,40 @@ impl BufferDisplay<'_> {
             offset,
         }
     }
+
+    /// Updates the x offset of the buffer so that the cursor is always visible
+    fn update_x_offset(&mut self, area: ratatui::prelude::Rect) {
+        let cursor_x = self
+            .cursor_position
+            .unwrap_or(&Position { line: 0, offset: 0 })
+            .offset;
+        if cursor_x as u16 >= area.width {
+            // If the current offset is greater than the length of the current line
+            // we need to adjust the offset so that the cursor is visible
+            self.offset.x = cursor_x - area.width as usize + 1;
+        }
+    }
+
+    /// Shifts the content of the buffer to the right by the offset and returns the resulting
+    /// string. Basically, takes every line and removes line[0:self.offset.x] from it, then
+    /// joins and returns them.
+    fn shift_content_right(self) -> String {
+        self.buffer_contents
+            .lines()
+            .map(|line| {
+                let line = line.chars().skip(self.offset.x).collect::<String>();
+                line
+            })
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
 }
 
 impl Widget for BufferDisplay<'_> {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let text_widget = Text::from(self.buffer_contents);
+    fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+        self.update_x_offset(area);
+        let contents = self.shift_content_right();
+        let text_widget = Text::from(contents);
         let paragraph_widget = Paragraph::new(text_widget);
         paragraph_widget.render(area, buf);
     }

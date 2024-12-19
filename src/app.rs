@@ -79,10 +79,10 @@ impl App {
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
-    fn render_buffer_contents(&self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
+    fn render_buffer_contents(&mut self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
         let buffer_contents = &self.backend.current_buffer_contents();
         let cursor_position = self.backend.cursor_position();
-        let offset = &self.ui_state.buffer_offset;
+        let offset = &mut self.ui_state.buffer_offset;
         let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
         buffer_widget.render(area, buf);
     }
@@ -207,7 +207,10 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
 
-    use ratatui::{buffer::Buffer, layout::Rect};
+    use ratatui::{
+        buffer::Buffer,
+        layout::{Position, Rect},
+    };
     use tempfile::NamedTempFile;
 
     use crate::test_util::temp_file_with_contents;
@@ -243,7 +246,7 @@ mod tests {
     #[test]
     fn test_render_buffer_contents_fit() {
         let contents = String::from("Hello, world!");
-        let app = app_with_file_contents(&contents);
+        let mut app = app_with_file_contents(&contents);
         let width = 15;
 
         let mut buf = Buffer::empty(Rect::new(0, 0, width, 2));
@@ -255,7 +258,7 @@ mod tests {
     #[test]
     fn test_render_buffer_contents_too_long() {
         let contents = "Hello, world!";
-        let app = app_with_file_contents(contents);
+        let mut app = app_with_file_contents(contents);
         let width = 4;
         let mut buf = Buffer::empty(Rect::new(0, 0, width, 1));
         let expected = Buffer::with_lines(vec!["Hell".to_string()]);
@@ -305,5 +308,43 @@ mod tests {
         app.backend.move_cursor_down();
         let pos = app.calculate_cursor_render_position(buf.area);
         assert_eq!(pos, (0, 0).into());
+    }
+
+    /// Helper function to verify cursor position and buffer rendering.
+    fn assert_cursor_and_buffer(
+        app: &mut App,
+        buf: &mut Buffer,
+        expected_cursor_pos: Position,
+        expected_lines: Vec<&str>,
+    ) {
+        // Verify cursor position.
+        let cursor_render_pos = app.calculate_cursor_render_position(buf.area);
+        assert_eq!(cursor_render_pos, expected_cursor_pos);
+
+        // Verify buffer contents.
+        let expected_buffer = Buffer::with_lines(
+            expected_lines
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<String>>(),
+        );
+        app.render_buffer_contents(buf.area, buf);
+        assert_eq!(*buf, expected_buffer);
+    }
+
+    /// The buffer contents should shift right so that lines that
+    /// are too long to render can be inspected by moving further right.
+    #[test]
+    fn test_buffer_shifts_when_moving_outside_visible_chars() {
+        let mut app = app_with_file_contents("123\n456");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 1, 2));
+
+        // Verify initial buffer rendering after the first cursor move.
+        app.backend.move_cursor_right();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["2", "5"]);
+
+        // Verify buffer rendering after the second cursor move.
+        app.backend.move_cursor_right();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["3", "6"]);
     }
 }
