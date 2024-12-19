@@ -123,18 +123,6 @@ impl App {
         }
     }
 
-    /// Try to move the cursor to the right unless it's at the
-    /// last character in the line. It's possible to do it in the
-    /// backend, but makes no sense unless inserting text
-    fn try_move_cursor_right(&mut self) {
-        if let Some(pos) = self.backend.cursor_position() {
-            let max_offset = self.backend.current_line_length() - 1;
-            if pos.offset < max_offset {
-                self.backend.move_cursor_right();
-            }
-        }
-    }
-
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key) => self.handle_key_event(key),
@@ -171,7 +159,7 @@ impl App {
                 Ok(())
             }
             KeyCode::Right => {
-                self.try_move_cursor_right();
+                self.backend.move_cursor_right();
                 Ok(())
             }
             KeyCode::Up => {
@@ -300,11 +288,21 @@ mod tests {
         let pos = app.calculate_cursor_render_position(buf.area);
         assert_eq!(pos, (0, 0).into());
 
-        app.try_move_cursor_right();
+        app.backend.move_cursor_right();
         let pos = app.calculate_cursor_render_position(buf.area);
-        assert_eq!(pos, (0, 0).into());
+        assert_eq!(pos, (1, 0).into());
 
-        app.try_move_cursor_right();
+        app.backend.move_cursor_right();
+        let pos = app.calculate_cursor_render_position(buf.area);
+        assert_eq!(pos, (1, 0).into());
+    }
+
+    #[test]
+    fn test_cant_move_cursor_too_far_down() {
+        let mut app = app_with_file_contents("123");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 10));
+
+        app.backend.move_cursor_down();
         let pos = app.calculate_cursor_render_position(buf.area);
         assert_eq!(pos, (0, 0).into());
     }
