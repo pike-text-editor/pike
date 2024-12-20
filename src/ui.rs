@@ -95,16 +95,25 @@ impl BufferDisplay<'_> {
 
     /// Updates the y offset of the buffer so that the cursor is always visible
     fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
-        // TODO: same thing as in update_x_offset
         let cursor_y = self
             .cursor_position
             .unwrap_or(&buffer::Position { line: 0, offset: 0 })
             .line;
-        if cursor_y as u16 >= area.height {
+
+        let too_far_down = cursor_y as u16 >= self.offset.y as u16 + area.height;
+        if too_far_down {
+            // If the current y coordinate of the cursor is below the visible area,
+            // the buffer has to be shifted down so that the cursor is visible
             self.offset.y = cursor_y - area.height as usize + 1;
         }
+
+        // If we're going out of sight from the top, clamp the offset
+        // with the cursor's position
+        self.offset.y = min(self.offset.y, cursor_y);
     }
 
+    /// Shifts the content of the buffer down by the offset and returns the resulting string.
+    /// Basically removes the first self.offset.y lines and joins the remanining ones.
     fn shift_contents_down(self, contents: String) -> String {
         contents
             .lines()
@@ -127,6 +136,8 @@ impl BufferDisplay<'_> {
             .join("\n")
     }
 
+    /// Calculates the render position of the cursor in the given rect, assuming that
+    /// self is going to be rendered there.
     pub fn calculate_cursor_render_position(&self, area: layout::Rect) -> layout::Position {
         let (max_x, max_y) = (area.width - 1, area.height - 1);
         let (base_x, base_y) = (area.x, area.y);
@@ -141,7 +152,7 @@ impl BufferDisplay<'_> {
                 max_x,
             ),
             y: min(
-                base_y + cursor_position.line as u16 - self.offset.y as u16,
+                (base_y + cursor_position.line as u16).saturating_sub(self.offset.y as u16),
                 max_y,
             ),
         }

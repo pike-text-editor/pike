@@ -348,22 +348,6 @@ mod tests {
         assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["3", "6"]);
     }
 
-    /// The buffer contents should shift down so that lines that
-    /// are too long to render can be inspected by moving further down.
-    #[test]
-    fn test_buffer_shifts_when_moving_outside_visible_lines() {
-        let mut app = app_with_file_contents("123\n456\n789");
-        let mut buf = Buffer::empty(Rect::new(0, 0, 3, 1));
-
-        // Verify initial buffer rendering after the first cursor move.
-        app.backend.move_cursor_down();
-        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456"]);
-
-        // Verify buffer rendering after the second cursor move.
-        app.backend.move_cursor_down();
-        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["789"]);
-    }
-
     /// When the buffer gets shifted right, it should not shift back
     /// left until the first displayed char is reached, only the visible
     /// cursor should be moved to the left
@@ -390,5 +374,48 @@ mod tests {
         // Move left, the buffer should shift left
         app.backend.move_cursor_left();
         assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["23"]);
+    }
+
+    /// The buffer contents should shift down so that lines that
+    /// are too long to render can be inspected by moving further down.
+    #[test]
+    fn test_buffer_shifts_when_moving_outside_visible_lines() {
+        let mut app = app_with_file_contents("123\n456\n789");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 3, 1));
+
+        // Verify initial buffer rendering after the first cursor move.
+        app.backend.move_cursor_down();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456"]);
+
+        // Verify buffer rendering after the second cursor move.
+        app.backend.move_cursor_down();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["789"]);
+    }
+
+    /// When the buffer gets shifted down, it should not shift back
+    /// up until the first displayed line is reached, only the visible
+    /// cursor should be moved up
+    #[test]
+    fn test_buffer_does_not_shift_up_until_necessary() {
+        let mut app = app_with_file_contents("123\n456\n789");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 3, 2));
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["123", "456"]);
+
+        // Move the cursor to the last line, shifting the buffer
+        app.backend.move_cursor_down();
+        app.backend.move_cursor_down();
+
+        // Verify initial buffer rendering after the first cursor move.
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 1).into(), vec!["456", "789"]);
+
+        // Move up
+        app.backend.move_cursor_up();
+
+        // The cursor should now point at 4 and be at (0, 0)
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456", "789"]);
+
+        // Move up, the buffer should shift up
+        app.backend.move_cursor_up();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["123", "456"]);
     }
 }
