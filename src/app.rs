@@ -1,4 +1,4 @@
-use std::{cmp::min, io, path::PathBuf};
+use std::{io, path::PathBuf};
 
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
@@ -101,7 +101,8 @@ impl App {
     }
 
     /// Renders the cursor in the current buffer
-    fn render_cursor(&self, area: layout::Rect, frame: &mut ratatui::prelude::Frame) {
+    fn render_cursor(&mut self, area: layout::Rect, frame: &mut ratatui::prelude::Frame) {
+        // TODO: probably should be split up so self is not mutable
         if let Some(position) = self.backend.cursor_position() {
             let cursor_position = self.calculate_cursor_render_position(area);
             frame.set_cursor_position(cursor_position);
@@ -110,17 +111,16 @@ impl App {
 
     /// Get the position to render the cursor at in the current buffer.
     /// Subject to changing when handling more input scenarios, only works
-    /// when editing the current buffer
-    pub fn calculate_cursor_render_position(&self, area: layout::Rect) -> Position {
-        let (max_x, max_y) = (area.width - 1, area.height - 1);
-        let (base_x, base_y) = (area.x, area.y);
+    /// when editing the current buffer. Self has to be mutable here, since
+    /// UIState is modified when calculating the cursor position
+    pub fn calculate_cursor_render_position(&mut self, area: layout::Rect) -> Position {
+        // TODO: tidy this up
+        let buffer_contents = &self.backend.current_buffer_contents();
+        let cursor_position = self.backend.cursor_position();
+        let offset = &mut self.ui_state.buffer_offset;
 
-        let cursor_position = self.backend.cursor_position().unwrap_or_default();
-
-        Position {
-            x: min(base_x + cursor_position.offset as u16, max_x),
-            y: min(base_y + cursor_position.line as u16, max_y),
-        }
+        let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
+        buffer_widget.calculate_cursor_render_position(area)
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -362,5 +362,33 @@ mod tests {
         // Verify buffer rendering after the second cursor move.
         app.backend.move_cursor_down();
         assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["789"]);
+    }
+
+    /// When the buffer gets shifted right, it should not shift back
+    /// left until the first displayed char is reached, only the visible
+    /// cursor should be moved to the left
+    #[test]
+    fn test_buffer_does_not_shift_left_until_necessary() {
+        let mut app = app_with_file_contents("1234");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 2, 1));
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["12"]);
+
+        // Move the cursor to the last char, shifting the buffer
+        app.backend.move_cursor_right();
+        app.backend.move_cursor_right();
+        app.backend.move_cursor_right();
+
+        // Verify initial buffer rendering after the first cursor move.
+        assert_cursor_and_buffer(&mut app, &mut buf, (1, 0).into(), vec!["34"]);
+
+        // Move left
+        app.backend.move_cursor_left();
+
+        // The cursor should now point at 3 and be at (0, 0)
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["34"]);
+
+        // Move left, the buffer should shift left
+        app.backend.move_cursor_left();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["23"]);
     }
 }

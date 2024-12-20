@@ -1,8 +1,10 @@
 use ratatui::{
+    layout,
     text::Text,
     widgets::{Paragraph, Widget},
 };
-use scribe::buffer::Position;
+use scribe::buffer;
+use std::cmp::min;
 
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
@@ -53,7 +55,7 @@ pub struct BufferDisplay<'a> {
     /// Contents of the buffer to render
     buffer_contents: &'a str,
     /// Current position of the cursor in the buffer
-    cursor_position: Option<&'a Position>,
+    cursor_position: Option<&'a buffer::Position>,
     /// Offset of the buffer being rendered
     offset: &'a mut BufferDisplayOffset,
 }
@@ -62,7 +64,7 @@ pub struct BufferDisplay<'a> {
 impl BufferDisplay<'_> {
     pub fn new<'a>(
         buffer_contents: &'a str,
-        cursor_position: Option<&'a Position>,
+        cursor_position: Option<&'a buffer::Position>,
         offset: &'a mut BufferDisplayOffset,
     ) -> BufferDisplay<'a> {
         BufferDisplay {
@@ -76,20 +78,27 @@ impl BufferDisplay<'_> {
     fn update_x_offset(&mut self, area: ratatui::prelude::Rect) {
         let cursor_x = self
             .cursor_position
-            .unwrap_or(&Position { line: 0, offset: 0 })
+            .unwrap_or(&buffer::Position { line: 0, offset: 0 })
             .offset;
-        if cursor_x as u16 >= area.width {
+
+        let too_far_right = cursor_x as u16 >= self.offset.x as u16 + area.width;
+        if too_far_right {
             // If the current offset is greater than the length of the current line
             // we need to adjust the offset so that the cursor is visible
             self.offset.x = cursor_x - area.width as usize + 1;
         }
+
+        // If we're going out of sight from to the left, clamp the offset
+        // with the cursor's position
+        self.offset.x = min(self.offset.x, cursor_x);
     }
 
     /// Updates the y offset of the buffer so that the cursor is always visible
     fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
+        // TODO: same thing as in update_x_offset
         let cursor_y = self
             .cursor_position
-            .unwrap_or(&Position { line: 0, offset: 0 })
+            .unwrap_or(&buffer::Position { line: 0, offset: 0 })
             .line;
         if cursor_y as u16 >= area.height {
             self.offset.y = cursor_y - area.height as usize + 1;
@@ -116,6 +125,26 @@ impl BufferDisplay<'_> {
             })
             .collect::<Vec<String>>()
             .join("\n")
+    }
+
+    pub fn calculate_cursor_render_position(&self, area: layout::Rect) -> layout::Position {
+        let (max_x, max_y) = (area.width - 1, area.height - 1);
+        let (base_x, base_y) = (area.x, area.y);
+
+        let cursor_position = self
+            .cursor_position
+            .unwrap_or(&buffer::Position { line: 0, offset: 0 });
+
+        layout::Position {
+            x: min(
+                (base_x + cursor_position.offset as u16).saturating_sub(self.offset.x as u16),
+                max_x,
+            ),
+            y: min(
+                base_y + cursor_position.line as u16 - self.offset.y as u16,
+                max_y,
+            ),
+        }
     }
 }
 
