@@ -1,9 +1,9 @@
 use ratatui::{
-    layout,
+    layout::{self, Position as TerminalPosition},
     text::Text,
     widgets::{Paragraph, Widget},
 };
-use scribe::buffer;
+use scribe::buffer::Position as BufferPosition;
 use std::cmp::min;
 
 /// We would like to have some struct which can be rendered
@@ -55,7 +55,7 @@ pub struct BufferDisplay<'a> {
     /// Contents of the buffer to render
     buffer_contents: &'a str,
     /// Current position of the cursor in the buffer
-    cursor_position: Option<&'a buffer::Position>,
+    cursor_position: Option<&'a BufferPosition>,
     /// Offset of the buffer being rendered
     offset: &'a mut BufferDisplayOffset,
 }
@@ -64,7 +64,7 @@ pub struct BufferDisplay<'a> {
 impl BufferDisplay<'_> {
     pub fn new<'a>(
         buffer_contents: &'a str,
-        cursor_position: Option<&'a buffer::Position>,
+        cursor_position: Option<&'a BufferPosition>,
         offset: &'a mut BufferDisplayOffset,
     ) -> BufferDisplay<'a> {
         BufferDisplay {
@@ -78,7 +78,7 @@ impl BufferDisplay<'_> {
     fn update_x_offset(&mut self, area: ratatui::prelude::Rect) {
         let cursor_x = self
             .cursor_position
-            .unwrap_or(&buffer::Position { line: 0, offset: 0 })
+            .unwrap_or(&BufferPosition { line: 0, offset: 0 })
             .offset;
 
         let too_far_right = cursor_x as u16 >= self.offset.x as u16 + area.width;
@@ -97,7 +97,7 @@ impl BufferDisplay<'_> {
     fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
         let cursor_y = self
             .cursor_position
-            .unwrap_or(&buffer::Position { line: 0, offset: 0 })
+            .unwrap_or(&BufferPosition { line: 0, offset: 0 })
             .line;
 
         let too_far_down = cursor_y as u16 >= self.offset.y as u16 + area.height;
@@ -138,15 +138,15 @@ impl BufferDisplay<'_> {
 
     /// Calculates the render position of the cursor in the given rect, assuming that
     /// self is going to be rendered there.
-    pub fn calculate_cursor_render_position(&self, area: layout::Rect) -> layout::Position {
+    pub fn calculate_cursor_render_position(&self, area: layout::Rect) -> TerminalPosition {
         let (max_x, max_y) = (area.width - 1, area.height - 1);
         let (base_x, base_y) = (area.x, area.y);
 
         let cursor_position = self
             .cursor_position
-            .unwrap_or(&buffer::Position { line: 0, offset: 0 });
+            .unwrap_or(&BufferPosition { line: 0, offset: 0 });
 
-        layout::Position {
+        TerminalPosition {
             x: min(
                 (base_x + cursor_position.offset as u16).saturating_sub(self.offset.x as u16),
                 max_x,

@@ -3,7 +3,7 @@ use std::{io, path::PathBuf};
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
-    layout::{self, Constraint, Direction, Layout, Position},
+    layout::{self, Constraint, Direction, Layout, Position as TerminalPosition},
     prelude::Backend,
     text::Text,
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
@@ -113,7 +113,7 @@ impl App {
     /// Subject to changing when handling more input scenarios, only works
     /// when editing the current buffer. Self has to be mutable here, since
     /// UIState is modified when calculating the cursor position
-    pub fn calculate_cursor_render_position(&mut self, area: layout::Rect) -> Position {
+    pub fn calculate_cursor_render_position(&mut self, area: layout::Rect) -> TerminalPosition {
         // TODO: tidy this up
         let buffer_contents = &self.backend.current_buffer_contents();
         let cursor_position = self.backend.cursor_position();
@@ -209,7 +209,7 @@ mod tests {
 
     use ratatui::{
         buffer::Buffer,
-        layout::{Position, Rect},
+        layout::{Position as TerminalPosition, Rect},
     };
     use tempfile::NamedTempFile;
 
@@ -314,7 +314,7 @@ mod tests {
     fn assert_cursor_and_buffer(
         app: &mut App,
         buf: &mut Buffer,
-        expected_cursor_pos: Position,
+        expected_cursor_pos: TerminalPosition,
         expected_lines: Vec<&str>,
     ) {
         // Verify cursor position.
