@@ -21,8 +21,8 @@ impl Pike {
         mut config_file: Option<PathBuf>,
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
-        let default_config_path = config::default_config_path();
         if config_file.is_none() {
+            let default_config_path = config::default_config_path();
             if let Ok(default_config_path) = default_config_path {
                 if default_config_path.exists() {
                     config_file = Some(default_config_path.to_path_buf());
