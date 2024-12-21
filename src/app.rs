@@ -3,32 +3,24 @@ use std::{io, path::PathBuf};
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
-    layout::{self, Constraint, Direction, Layout},
+    layout::{self, Constraint, Direction, Layout, Position as TerminalPosition},
     prelude::Backend,
     text::Text,
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
     Terminal,
 };
 
-use crate::pike::Pike;
+use crate::{
+    pike::Pike,
+    ui::{BufferDisplay, UIState},
+};
 
 /// TUI application which displays the UI and handles events
 #[allow(dead_code)]
 pub struct App {
     exit: bool,
     backend: Pike,
-}
-
-impl Widget for &App {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Max(2)]);
-        let main_area = layout.split(area)[0];
-        let status_bar_area = layout.split(area)[1];
-        self.render_buffer_contents(main_area, buf);
-        self.render_status_bar(status_bar_area, buf);
-    }
+    ui_state: UIState,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -59,6 +51,7 @@ impl App {
         App {
             exit: false,
             backend,
+            ui_state: UIState::default(),
         }
     }
 
@@ -73,16 +66,25 @@ impl App {
         }
     }
 
-    fn draw(&self, frame: &mut ratatui::Frame) {
-        frame.render_widget(self, frame.area());
+    fn draw(&mut self, frame: &mut ratatui::Frame) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Max(2)]);
+        let area = frame.area();
+        let main_area = layout.split(area)[0];
+        let status_bar_area = layout.split(area)[1];
+        self.render_buffer_contents(main_area, frame.buffer_mut());
+        self.render_status_bar(status_bar_area, frame.buffer_mut());
+        self.render_cursor(main_area, frame);
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
-    fn render_buffer_contents(&self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let contents = self.backend.current_buffer_contents();
-        let text_widget = Text::from(contents);
-        let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
-        paragraph_widget.render(area, buf);
+    fn render_buffer_contents(&mut self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
+        let buffer_contents = &self.backend.current_buffer_contents();
+        let cursor_position = self.backend.cursor_position();
+        let offset = &mut self.ui_state.buffer_offset;
+        let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
+        buffer_widget.render(area, buf);
     }
 
     /// Render the status bar in a given Rect
@@ -96,6 +98,49 @@ impl App {
         let block_widget = paragraph_widget.block(Block::default().borders(Borders::TOP));
 
         block_widget.render(area, buf);
+    }
+
+    /// Renders the cursor in the current buffer
+    fn render_cursor(&mut self, area: layout::Rect, frame: &mut ratatui::prelude::Frame) {
+        // TODO: probably should be split up so self is not mutable
+        if let Some(position) = self.backend.cursor_position() {
+            let cursor_position = self.calculate_cursor_render_position(area);
+            frame.set_cursor_position(cursor_position);
+        }
+    }
+
+    /// Get the position to render the cursor at in the current buffer.
+    /// Subject to changing when handling more input scenarios, only works
+    /// when editing the current buffer. Self has to be mutable here, since
+    /// UIState is modified when calculating the cursor position
+    pub fn calculate_cursor_render_position(&mut self, area: layout::Rect) -> TerminalPosition {
+        // TODO: this is an ugly hack. an instance of a widget which is dropped at the end of this
+        // function should not have to be created, this should probably be a widget ref stored in
+        // the UI state, so that it can be used in multiple places without having to be rebuilt
+        // each time. This will be a separate issue.
+        //
+        // The problem is:
+        //  * the cursor rendering position has to be calculated by the widget that currently owns
+        //  it, since it relies on some widget state specific info, like UIState.buffer_offset.
+        //  * the widgets should be wrapped in separate methods so that app.draw is not 200 lines
+        //  long and messy, as it is now, which does not let us access the widgets directly.
+        //  * in order to draw the cursor, access to the frame is required directly, which
+        //  is not provided to the render_buffer_contents, etc methods, since they're supposed
+        //  to render in a buffer to be unit tested easily.
+        //
+        //  So, we need to calculate the position "above" the functions that create and render the
+        //  widgets, but we need the widgets themselves for this to be done. The app should
+        //  probably just check what is being done and call the correct handler to calculate the
+        //  cursor rendering position for it.
+        //
+        //  This is not a large overhead, since it's just creating one more object which does not
+        //  copy any data, but it's ugly and stinks
+        let buffer_contents = &self.backend.current_buffer_contents();
+        let cursor_position = self.backend.cursor_position();
+        let offset = &mut self.ui_state.buffer_offset;
+
+        let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
+        buffer_widget.calculate_cursor_render_position(area)
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -127,6 +172,22 @@ impl App {
         match key.code {
             KeyCode::Char('q') => {
                 self.exit();
+                Ok(())
+            }
+            KeyCode::Left => {
+                self.backend.move_cursor_left();
+                Ok(())
+            }
+            KeyCode::Right => {
+                self.backend.move_cursor_right();
+                Ok(())
+            }
+            KeyCode::Up => {
+                self.backend.move_cursor_up();
+                Ok(())
+            }
+            KeyCode::Down => {
+                self.backend.move_cursor_down();
                 Ok(())
             }
             _ => Ok(()),
@@ -166,7 +227,10 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
 
-    use ratatui::{buffer::Buffer, layout::Rect};
+    use ratatui::{
+        buffer::Buffer,
+        layout::{Position as TerminalPosition, Rect},
+    };
     use tempfile::NamedTempFile;
 
     use crate::test_util::temp_file_with_contents;
@@ -200,9 +264,9 @@ mod tests {
     }
 
     #[test]
-    fn test_render_buffer_contents_no_wrap() {
+    fn test_render_buffer_contents_fit() {
         let contents = String::from("Hello, world!");
-        let app = app_with_file_contents(&contents);
+        let mut app = app_with_file_contents(&contents);
         let width = 15;
 
         let mut buf = Buffer::empty(Rect::new(0, 0, width, 2));
@@ -212,17 +276,12 @@ mod tests {
     }
 
     #[test]
-    fn test_render_buffer_contents_wraps() {
+    fn test_render_buffer_contents_too_long() {
         let contents = "Hello, world!";
-        let app = app_with_file_contents(contents);
-        let width = 5;
-        let mut buf = Buffer::empty(Rect::new(0, 0, width, 4));
-        let expected = Buffer::with_lines(vec![
-            "Hello".to_string(),
-            ",".to_string(),
-            "world".to_string(),
-            "!".to_string(),
-        ]);
+        let mut app = app_with_file_contents(contents);
+        let width = 4;
+        let mut buf = Buffer::empty(Rect::new(0, 0, width, 1));
+        let expected = Buffer::with_lines(vec!["Hell".to_string()]);
         app.render_buffer_contents(buf.area, &mut buf);
         assert_eq!(buf, expected);
     }
@@ -240,5 +299,145 @@ mod tests {
         let expected = Buffer::with_lines(vec![solid_border(width.into()), filename.to_string()]);
         app.render_status_bar(buf.area, &mut buf);
         assert_eq!(buf, expected)
+    }
+
+    /// Helper function to assert the position to render the cursor at in the visible
+    /// buffer
+    fn assert_cursor_render_pos(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
+        let pos = app.calculate_cursor_render_position(buf.area);
+        assert_eq!(pos, expected.into());
+    }
+
+    /// The cursor should not move past the bounds of the buffer
+    #[test]
+    fn test_cant_move_cursor_too_far_right() {
+        let mut app = app_with_file_contents("t");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 1));
+
+        // Starts at (0, 0)
+        assert_cursor_render_pos(&mut app, &buf, (0, 0));
+
+        app.backend.move_cursor_right();
+        assert_cursor_render_pos(&mut app, &buf, (1, 0));
+
+        app.backend.move_cursor_right();
+        assert_cursor_render_pos(&mut app, &buf, (1, 0));
+    }
+
+    #[test]
+    fn test_cant_move_cursor_too_far_down() {
+        let mut app = app_with_file_contents("123");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 10));
+
+        app.backend.move_cursor_down();
+        assert_cursor_render_pos(&mut app, &buf, (0, 0));
+    }
+
+    /// Helper function to verify cursor position and buffer rendering.
+    fn assert_cursor_and_buffer(
+        app: &mut App,
+        buf: &mut Buffer,
+        expected_cursor_pos: TerminalPosition,
+        expected_lines: Vec<&str>,
+    ) {
+        // Verify cursor position.
+        assert_cursor_render_pos(app, buf, expected_cursor_pos.into());
+
+        // Verify buffer contents.
+        let expected_buffer = Buffer::with_lines(
+            expected_lines
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<String>>(),
+        );
+        app.render_buffer_contents(buf.area, buf);
+        assert_eq!(*buf, expected_buffer);
+    }
+
+    /// The buffer contents should shift right so that lines that
+    /// are too long to render can be inspected by moving further right.
+    #[test]
+    fn test_buffer_shifts_when_moving_outside_visible_chars() {
+        let mut app = app_with_file_contents("123\n456");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 1, 2));
+
+        // Verify initial buffer rendering after the first cursor move.
+        app.backend.move_cursor_right();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["2", "5"]);
+
+        // Verify buffer rendering after the second cursor move.
+        app.backend.move_cursor_right();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["3", "6"]);
+    }
+
+    /// When the buffer gets shifted right, it should not shift back
+    /// left until the first displayed char is reached, only the visible
+    /// cursor should be moved to the left
+    #[test]
+    fn test_buffer_does_not_shift_left_until_necessary() {
+        let mut app = app_with_file_contents("1234");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 2, 1));
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["12"]);
+
+        // Move the cursor to the last char, shifting the buffer
+        app.backend.move_cursor_right();
+        app.backend.move_cursor_right();
+        app.backend.move_cursor_right();
+
+        // Verify initial buffer rendering after the first cursor move.
+        assert_cursor_and_buffer(&mut app, &mut buf, (1, 0).into(), vec!["34"]);
+
+        // Move left
+        app.backend.move_cursor_left();
+
+        // The cursor should now point at 3 and be at (0, 0)
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["34"]);
+
+        // Move left, the buffer should shift left
+        app.backend.move_cursor_left();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["23"]);
+    }
+
+    /// The buffer contents should shift down so that lines that
+    /// are too long to render can be inspected by moving further down.
+    #[test]
+    fn test_buffer_shifts_when_moving_outside_visible_lines() {
+        let mut app = app_with_file_contents("123\n456\n789");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 3, 1));
+
+        // Verify initial buffer rendering after the first cursor move.
+        app.backend.move_cursor_down();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456"]);
+
+        // Verify buffer rendering after the second cursor move.
+        app.backend.move_cursor_down();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["789"]);
+    }
+
+    /// When the buffer gets shifted down, it should not shift back
+    /// up until the first displayed line is reached, only the visible
+    /// cursor should be moved up
+    #[test]
+    fn test_buffer_does_not_shift_up_until_necessary() {
+        let mut app = app_with_file_contents("123\n456\n789");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 3, 2));
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["123", "456"]);
+
+        // Move the cursor to the last line, shifting the buffer
+        app.backend.move_cursor_down();
+        app.backend.move_cursor_down();
+
+        // Verify initial buffer rendering after the first cursor move.
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 1).into(), vec!["456", "789"]);
+
+        // Move up
+        app.backend.move_cursor_up();
+
+        // The cursor should now point at 4 and be at (0, 0)
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456", "789"]);
+
+        // Move up, the buffer should shift up
+        app.backend.move_cursor_up();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0).into(), vec!["123", "456"]);
     }
 }

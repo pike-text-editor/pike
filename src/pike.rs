@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::config::Config;
-use scribe::buffer::Position;
-use scribe::Workspace;
+use scribe::buffer::Position as BufferPosition;
+use scribe::{Buffer, Workspace};
 
 /// Backend of the app
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -59,7 +59,7 @@ impl Pike {
             .as_mut()
             .expect("Scribe's open_buffer should set a buffer")
             .cursor
-            .move_to(Position { line, offset });
+            .move_to(BufferPosition { line, offset });
 
         Ok(())
     }
@@ -78,15 +78,19 @@ impl Pike {
     /// Returns the contents of the currently opened buffer or
     /// an empty string if none is open
     pub fn current_buffer_contents(&self) -> String {
-        match self.workspace.current_buffer.as_ref() {
+        match self.current_buffer().as_ref() {
             Some(buffer) => buffer.data(),
             None => String::from(""),
         }
     }
 
+    pub fn current_buffer_path(&self) -> Option<&Path> {
+        self.workspace.current_buffer_path()
+    }
+
     /// Returns the filename of the current buffer or an empty string
     pub fn current_buffer_filename(&self) -> String {
-        match self.workspace.current_buffer_path() {
+        match self.current_buffer_path() {
             // TODO: check this goofy ahh chain
             Some(path) => path.file_name().unwrap().to_str().unwrap().to_string(),
             None => String::from(""),
@@ -96,9 +100,64 @@ impl Pike {
     /// Returns whether the current buffer has unsaved changes or
     /// false if it's empty
     pub fn has_unsaved_changes(&self) -> bool {
-        match &self.workspace.current_buffer {
+        match &self.current_buffer() {
             Some(buffer) => buffer.modified(),
             None => false,
+        }
+    }
+
+    /// Returns the position of the cursor in the current buffer
+    /// or None if there isn't one
+    pub fn cursor_position(&self) -> Option<BufferPosition> {
+        self.workspace
+            .current_buffer
+            .as_ref()
+            .map(|buffer| buffer.cursor.position)
+    }
+
+    /// Getter for the current buffer
+    pub fn current_buffer(&self) -> Option<&Buffer> {
+        self.workspace.current_buffer.as_ref()
+    }
+
+    /// Move the cursor up if possible, else do nothing
+    pub fn move_cursor_up(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_up();
+        }
+    }
+
+    /// Move the cursor down if possible, else do nothing
+    pub fn move_cursor_down(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_down();
+        }
+    }
+
+    /// Move the cursor left if possible, else do nothing
+    pub fn move_cursor_left(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_left();
+        }
+    }
+
+    /// Move the cursor right if possible, else do nothing
+    pub fn move_cursor_right(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_right();
+        }
+    }
+
+    /// Returns the length of the current line
+    pub fn current_line_length(&self) -> usize {
+        let current_line_number = self.cursor_position().map_or(0, |pos| pos.line);
+        match self
+            .current_buffer_contents()
+            .lines()
+            .nth(current_line_number)
+        {
+            Some(line) => line.len(),
+            None => 0,
         }
     }
 
@@ -192,7 +251,7 @@ mod pike_test {
         let (pike, cwd) = tmp_pike_and_working_dir(None, None);
 
         assert_eq!(pike.workspace.path, cwd);
-        assert!(pike.workspace.current_buffer.is_none());
+        assert!(pike.current_buffer().is_none());
         assert!(pike.config == Config::default());
     }
 
@@ -408,5 +467,77 @@ mod pike_test {
         let pike = tmp_pike_and_working_dir(None, None).0;
 
         assert!(!pike.has_unsaved_changes());
+    }
+
+    /// When moving down to a shorter line, the
+    /// cursor position should be clamped to its length
+    #[test]
+    fn test_move_cursor_down_shorter_line() {
+        let contents = r#"Hello!
+
+        This is a test."#;
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+        for _ in 0..5 {
+            pike.move_cursor_right();
+        }
+
+        pike.move_cursor_down();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 1, offset: 0 })
+        );
+    }
+
+    /// The cursor should not move out of the bounds of the current
+    /// buffer
+    #[test]
+    fn test_move_cursor_out_of_bounds() {
+        let contents = "a";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_right();
+        assert_eq!(
+            pike.cursor_position(),
+            // This makes sense, since inserting does not move the cursor right
+            Some(Position { line: 0, offset: 1 })
+        );
+
+        // Two times to the left to test for going too far to the left
+        pike.move_cursor_left();
+        pike.move_cursor_left();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+
+        pike.move_cursor_down();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+
+        pike.move_cursor_up();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+    }
+
+    #[test]
+    fn test_current_line_length_buffer_exists() {
+        let contents = ["Hello!", ""].join("\n");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents.as_str()));
+
+        assert_eq!(pike.current_line_length(), 6);
+
+        pike.move_cursor_down();
+        assert_eq!(pike.current_line_length(), 0);
+    }
+
+    #[test]
+    fn test_current_line_length_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert_eq!(pike.current_line_length(), 0);
     }
 }
