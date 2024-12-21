@@ -3,6 +3,7 @@ mod config;
 mod key_shortcut;
 mod operations;
 mod pike;
+mod test_util;
 mod ui;
 
 use clap::Parser;

@@ -21,8 +21,8 @@ impl Pike {
         mut config_file: Option<PathBuf>,
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
-        let default_config_path = config::default_config_path();
         if config_file.is_none() {
+            let default_config_path = config::default_config_path();
             if let Ok(default_config_path) = default_config_path {
                 if default_config_path.exists() {
                     config_file = Some(default_config_path.to_path_buf());
@@ -72,6 +72,33 @@ impl Pike {
                 Ok(())
             }
             None => Err("Trying to write to a non-existent buffer".to_string()),
+        }
+    }
+
+    /// Returns the contents of the currently opened buffer or
+    /// an empty string if none is open
+    pub fn current_buffer_contents(&self) -> String {
+        match self.workspace.current_buffer.as_ref() {
+            Some(buffer) => buffer.data(),
+            None => String::from(""),
+        }
+    }
+
+    /// Returns the filename of the current buffer or an empty string
+    pub fn current_buffer_filename(&self) -> String {
+        match self.workspace.current_buffer_path() {
+            // TODO: check this goofy ahh chain
+            Some(path) => path.file_name().unwrap().to_str().unwrap().to_string(),
+            None => String::from(""),
+        }
+    }
+
+    /// Returns whether the current buffer has unsaved changes or
+    /// false if it's empty
+    pub fn has_unsaved_changes(&self) -> bool {
+        match &self.workspace.current_buffer {
+            Some(buffer) => buffer.modified(),
+            None => false,
         }
     }
 
@@ -132,19 +159,10 @@ impl Pike {
 mod pike_test {
     use std::{env, path::PathBuf};
 
-    use crate::config::Config;
+    use crate::{config::Config, test_util::temp_file_with_contents};
     use scribe::buffer::Position;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
 
     use super::Pike;
-
-    fn temp_file_with_contents(contents: &str) -> NamedTempFile {
-        let mut file = NamedTempFile::new().expect("Failed to create temp file");
-        file.write_all(contents.as_bytes())
-            .expect("Failed to write to temp file");
-        file
-    }
 
     /// Setup before a test, creates an instance of pike in
     /// a temporary directory and returns them. Optionally takes
@@ -324,5 +342,71 @@ mod pike_test {
             result,
             Err("Trying to save a non-existent buffer".to_string())
         );
+    }
+
+    #[test]
+    fn test_current_buffer_contents_has_buffer() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+    }
+
+    #[test]
+    fn test_current_buffer_contents_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert_eq!(pike.current_buffer_contents(), "");
+    }
+
+    #[test]
+    fn test_current_buffer_fname_has_buffer() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        assert_eq!(
+            pike.current_buffer_filename(),
+            file.path().file_name().unwrap().to_str().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_current_buffer_fname_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert_eq!(pike.current_buffer_filename(), "");
+    }
+
+    #[test]
+    fn test_has_unsaved_changes_has_changes() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+        pike.write_to_current_buffer("belo")
+            .expect("Failed to write to file");
+
+        assert!(pike.has_unsaved_changes());
+    }
+
+    #[test]
+    fn test_has_unsaved_changes_no_changes() {
+        let file = temp_file_with_contents("Hello, world!");
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        assert!(!pike.has_unsaved_changes());
+    }
+
+    #[test]
+    fn test_has_unsaved_changes_no_buffer() {
+        let pike = tmp_pike_and_working_dir(None, None).0;
+
+        assert!(!pike.has_unsaved_changes());
     }
 }
