@@ -281,6 +281,13 @@ mod tests {
         assert_eq!(buf, expected)
     }
 
+    /// Helper function to assert the position to render the cursor at in the visible
+    /// buffer
+    fn assert_cursor_render_pos(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
+        let pos = app.calculate_cursor_render_position(buf.area);
+        assert_eq!(pos, expected.into());
+    }
+
     /// The cursor should not move past the bounds of the buffer
     #[test]
     fn test_cant_move_cursor_too_far_right() {
@@ -288,16 +295,13 @@ mod tests {
         let buf = Buffer::empty(Rect::new(0, 0, 10, 1));
 
         // Starts at (0, 0)
-        let pos = app.calculate_cursor_render_position(buf.area);
-        assert_eq!(pos, (0, 0).into());
+        assert_cursor_render_pos(&mut app, &buf, (0, 0));
 
         app.backend.move_cursor_right();
-        let pos = app.calculate_cursor_render_position(buf.area);
-        assert_eq!(pos, (1, 0).into());
+        assert_cursor_render_pos(&mut app, &buf, (1, 0));
 
         app.backend.move_cursor_right();
-        let pos = app.calculate_cursor_render_position(buf.area);
-        assert_eq!(pos, (1, 0).into());
+        assert_cursor_render_pos(&mut app, &buf, (1, 0));
     }
 
     #[test]
@@ -306,8 +310,7 @@ mod tests {
         let buf = Buffer::empty(Rect::new(0, 0, 10, 10));
 
         app.backend.move_cursor_down();
-        let pos = app.calculate_cursor_render_position(buf.area);
-        assert_eq!(pos, (0, 0).into());
+        assert_cursor_render_pos(&mut app, &buf, (0, 0));
     }
 
     /// Helper function to verify cursor position and buffer rendering.
@@ -318,8 +321,7 @@ mod tests {
         expected_lines: Vec<&str>,
     ) {
         // Verify cursor position.
-        let cursor_render_pos = app.calculate_cursor_render_position(buf.area);
-        assert_eq!(cursor_render_pos, expected_cursor_pos);
+        assert_cursor_render_pos(app, buf, expected_cursor_pos.into());
 
         // Verify buffer contents.
         let expected_buffer = Buffer::with_lines(
