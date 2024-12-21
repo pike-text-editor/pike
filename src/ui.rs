@@ -60,7 +60,7 @@ pub struct BufferDisplay<'a> {
     offset: &'a mut BufferDisplayOffset,
 }
 
-// TODO: think about refactoring to a stateful widget
+// TODO: think about refactoring to a stateful widget or widgetref
 impl BufferDisplay<'_> {
     pub fn new<'a>(
         buffer_contents: &'a str,

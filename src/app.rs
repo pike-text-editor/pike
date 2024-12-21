@@ -114,7 +114,27 @@ impl App {
     /// when editing the current buffer. Self has to be mutable here, since
     /// UIState is modified when calculating the cursor position
     pub fn calculate_cursor_render_position(&mut self, area: layout::Rect) -> TerminalPosition {
-        // TODO: tidy this up
+        // TODO: this is an ugly hack. an instance of a widget which is dropped at the end of this
+        // function should not have to be created, this should probably be a widget ref stored in
+        // the UI state, so that it can be used in multiple places without having to be rebuilt
+        // each time. This will be a separate issue.
+        //
+        // The problem is:
+        //  * the cursor rendering position has to be calculated by the widget that currently owns
+        //  it, since it relies on some widget state specific info, like UIState.buffer_offset.
+        //  * the widgets should be wrapped in separate methods so that app.draw is not 200 lines
+        //  long and messy, as it is now, which does not let us access the widgets directly.
+        //  * in order to draw the cursor, access to the frame is required directly, which
+        //  is not provided to the render_buffer_contents, etc methods, since they're supposed
+        //  to render in a buffer to be unit tested easily.
+        //
+        //  So, we need to calculate the position "above" the functions that create and render the
+        //  widgets, but we need the widgets themselves for this to be done. The app should
+        //  probably just check what is being done and call the correct handler to calculate the
+        //  cursor rendering position for it.
+        //
+        //  This is not a large overhead, since it's just creating one more object which does not
+        //  copy any data, but it's ugly and stinks
         let buffer_contents = &self.backend.current_buffer_contents();
         let cursor_position = self.backend.cursor_position();
         let offset = &mut self.ui_state.buffer_offset;
