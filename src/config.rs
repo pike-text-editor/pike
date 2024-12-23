@@ -22,6 +22,18 @@ pub fn default_config_file_path() -> Result<PathBuf, String> {
     }
 }
 
+/// Return the configuration directory path for pike.
+#[allow(dead_code)]
+pub fn default_config_dir_path() -> Result<PathBuf, String> {
+    let config_dir = dirs::config_dir();
+    match config_dir {
+        Some(mut path) => {
+            path.push("pike");
+            Ok(path)
+        }
+        None => Err("Failed to get the configuration directory".to_string()),
+    }
+}
 /// Editor configuration
 #[derive(Debug, PartialEq, Eq)]
 pub struct Config {
@@ -316,8 +328,8 @@ mod config_test {
 
     #[test]
     fn test_default_config_path() {
-        let expected = dirs::config_dir().unwrap().join("pike.toml");
-        let actual = super::default_config_path().expect("Failed to get default config path");
+        let expected = dirs::config_dir().unwrap().join("pike").join("pike.toml");
+        let actual = super::default_config_file_path().expect("Failed to get default config path");
         assert_eq!(expected, actual);
     }
 }
