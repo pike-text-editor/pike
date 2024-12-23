@@ -12,7 +12,7 @@ use ratatui::{
 
 use crate::{
     pike::Pike,
-    ui::{BufferDisplay, UIState},
+    ui::{BufferDisplayWidget, UIState},
 };
 
 /// TUI application which displays the UI and handles events
