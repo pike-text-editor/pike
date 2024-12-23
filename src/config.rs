@@ -10,10 +10,11 @@ use std::{
 
 /// Returns the default configuration path for pike regardless
 /// of OS
-pub fn default_config_path() -> Result<PathBuf, String> {
+pub fn default_config_file_path() -> Result<PathBuf, String> {
     let config_dir = dirs::config_dir();
     match config_dir {
         Some(mut path) => {
+            path.push("pike");
             path.push("pike.toml");
             Ok(path)
         }
