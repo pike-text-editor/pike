@@ -65,13 +65,25 @@ impl Pike {
     }
 
     /// Writes `text` to current buffer
-    fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
+    pub fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
                 buffer.insert(text);
                 Ok(())
             }
             None => Err("Trying to write to a non-existent buffer".to_string()),
+        }
+    }
+
+    pub fn delete_character(&mut self) {
+        // TODO: single if block, should probably just
+        // delete the character from the left and not succeed
+        // if we're at the start of a file
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            self.move_cursor_left();
+        }
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.delete();
         }
     }
 
@@ -82,6 +94,11 @@ impl Pike {
             Some(buffer) => buffer.data(),
             None => String::from(""),
         }
+    }
+
+    pub fn get_config(&self) -> &Config {
+        // TODO: maybe make config public, idk
+        &self.config
     }
 
     pub fn current_buffer_path(&self) -> Option<&Path> {
@@ -188,7 +205,7 @@ impl Pike {
     }
 
     /// Save the current buffer to its file
-    fn save_current_buffer(&mut self) -> Result<(), String> {
+    pub fn save_current_buffer(&mut self) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
                 buffer.save().expect("Failed to save buffer");

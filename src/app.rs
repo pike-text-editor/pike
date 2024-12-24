@@ -1,7 +1,7 @@
 use std::{io, path::PathBuf};
 
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use ratatui::{
     layout::{self, Constraint, Direction, Layout, Position as TerminalPosition},
     prelude::Backend,
@@ -11,6 +11,9 @@ use ratatui::{
 };
 
 use crate::{
+    config::Config,
+    key_shortcut::KeyShortcut,
+    operations::Operation,
     pike::Pike,
     ui::{BufferDisplay, UIState},
 };
@@ -62,7 +65,8 @@ impl App {
             }
 
             terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
+            self.handle_events()
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         }
     }
 
@@ -143,8 +147,8 @@ impl App {
         buffer_widget.calculate_cursor_render_position(area)
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
+    fn handle_events(&mut self) -> Result<(), String> {
+        match event::read().map_err(|e| e.to_string())? {
             Event::Key(key) => self.handle_key_event(key),
             Event::Mouse(mouse) => self.handle_mouse_event(mouse),
             Event::Paste(paste) => self.handle_paste_event(paste),
@@ -152,7 +156,7 @@ impl App {
         }
     }
 
-    fn handle_key_event(&mut self, event: KeyEvent) -> Result<(), io::Error> {
+    fn handle_key_event(&mut self, event: KeyEvent) -> Result<(), String> {
         match event.kind {
             event::KeyEventKind::Press => self.handle_key_press(event),
             event::KeyEventKind::Release => Ok(()),
@@ -160,15 +164,40 @@ impl App {
         }
     }
 
-    fn handle_paste_event(&self, contents: String) -> Result<(), io::Error> {
+    fn handle_paste_event(&self, contents: String) -> Result<(), String> {
         todo!()
     }
 
-    fn handle_mouse_event(&self, event: MouseEvent) -> Result<(), io::Error> {
+    fn handle_mouse_event(&self, event: MouseEvent) -> Result<(), String> {
         todo!()
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
+    pub fn config(&self) -> &Config {
+        self.backend.get_config()
+    }
+
+    fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), String> {
+        if let KeyModifiers::NONE = key.modifiers {
+            if let KeyCode::Char(chr) = key.code {
+                // TODO: handle error properly
+                self.backend.write_to_current_buffer(&chr.to_string())?;
+                self.backend.move_cursor_right();
+                return Ok(());
+            }
+
+            if let KeyCode::Enter = key.code {
+                // TODO: handle error properly
+                self.backend.write_to_current_buffer("\n")?;
+                self.backend.move_cursor_down();
+                return Ok(());
+            }
+
+            if let KeyCode::Backspace = key.code {
+                self.backend.delete_character();
+                return Ok(());
+            }
+        }
+
         match key.code {
             KeyCode::Char('q') => {
                 self.exit();
@@ -190,7 +219,19 @@ impl App {
                 self.backend.move_cursor_down();
                 Ok(())
             }
-            _ => Ok(()),
+            other => {
+                let op = self
+                    .config()
+                    .operation_of(KeyShortcut::from_key_event(&key));
+
+                {
+                    if op == &Operation::SaveBufferToFile {
+                        self.backend.save_current_buffer()
+                    } else {
+                        Ok(())
+                    }
+                }
+            }
         }
     }
 

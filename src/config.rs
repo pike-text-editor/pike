@@ -57,6 +57,13 @@ impl Config {
         }
     }
 
+    pub fn operation_of(&self, shortcut: KeyShortcut) -> &Operation {
+        self.key_mappings.get(&shortcut).expect(
+            "All mappings should have
+            corresponding keybinds",
+        )
+    }
+
     /// Creates a vector of pairs (shortcut, operation) to
     /// be inserted into the config's keymap section
     /// over the default configuration
