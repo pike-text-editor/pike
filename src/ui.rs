@@ -1,7 +1,6 @@
 use ratatui::{
-    layout::{self, Position as TerminalPosition},
-    text::Text,
-    widgets::{Paragraph, Widget},
+    text::{Text, ToText},
+    widgets::{self, Paragraph, StatefulWidget, Widget},
 };
 use scribe::buffer::Position as BufferPosition;
 use std::cmp::min;
@@ -25,9 +24,9 @@ struct Picker {}
 #[derive(Default)]
 pub struct BufferDisplayOffset {
     /// X offset of the line pointed at by the cursor
-    x: usize,
+    pub x: usize,
     /// Y offset of the entire buffer
-    y: usize,
+    pub y: usize,
 }
 
 #[allow(dead_code)]
@@ -44,6 +43,9 @@ impl BufferDisplayOffset {
 pub struct UIState {
     /// Offset of the currently rendered buffer
     pub buffer_offset: BufferDisplayOffset,
+
+    /// Currently open file input
+    pub file_input: Option<tui_input::Input>,
 }
 
 /// Widget for displaying the buffer contents. Serves as a thin wrapper
@@ -54,8 +56,10 @@ pub struct UIState {
 pub struct BufferDisplay<'a> {
     /// Contents of the buffer to render
     buffer_contents: &'a str,
+
     /// Current position of the cursor in the buffer
     cursor_position: Option<&'a BufferPosition>,
+
     /// Offset of the buffer being rendered
     offset: &'a mut BufferDisplayOffset,
 }
@@ -135,28 +139,6 @@ impl BufferDisplay<'_> {
             .collect::<Vec<String>>()
             .join("\n")
     }
-
-    /// Calculates the render position of the cursor in the given rect, assuming that
-    /// self is going to be rendered there.
-    pub fn calculate_cursor_render_position(&self, area: layout::Rect) -> TerminalPosition {
-        let (max_x, max_y) = (area.width - 1, area.height - 1);
-        let (base_x, base_y) = (area.x, area.y);
-
-        let cursor_position = self
-            .cursor_position
-            .unwrap_or(&BufferPosition { line: 0, offset: 0 });
-
-        TerminalPosition {
-            x: min(
-                (base_x + cursor_position.offset as u16).saturating_sub(self.offset.x as u16),
-                max_x,
-            ),
-            y: min(
-                (base_y + cursor_position.line as u16).saturating_sub(self.offset.y as u16),
-                max_y,
-            ),
-        }
-    }
 }
 
 impl Widget for BufferDisplay<'_> {
@@ -169,5 +151,30 @@ impl Widget for BufferDisplay<'_> {
         let text_widget = Text::from(contents_shifted_down);
         let paragraph_widget = Paragraph::new(text_widget);
         paragraph_widget.render(area, buf);
+    }
+}
+
+/// A widget for displaying a text input passed to it as a state
+/// In the future might need factoring out to accomodate other UI
+/// elements that need such functionality and just have a title
+/// and callback passed to it as arguments
+#[derive(Default)]
+pub struct FileInput {}
+
+impl StatefulWidget for FileInput {
+    type State = tui_input::Input;
+
+    fn render(
+        self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        state: &mut Self::State,
+    ) {
+        let widget = widgets::Paragraph::new(state.to_text()).block(
+            widgets::Block::new()
+                .borders(widgets::Borders::all())
+                .title("Enter relative file path"),
+        );
+        widget.render(area, buf)
     }
 }
