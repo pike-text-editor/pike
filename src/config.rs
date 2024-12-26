@@ -11,15 +11,9 @@ use std::{
 /// Returns the default configuration path for pike regardless
 /// of OS
 pub fn default_config_file_path() -> Result<PathBuf, String> {
-    let config_dir = dirs::config_dir();
-    match config_dir {
-        Some(mut path) => {
-            path.push("pike");
-            path.push("pike.toml");
-            Ok(path)
-        }
-        None => Err("Failed to get the configuration directory".to_string()),
-    }
+    let mut path = default_config_dir_path()?;
+    path.push("pike.toml");
+    Ok(path)
 }
 
 /// Return the configuration directory path for pike.
