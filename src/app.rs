@@ -84,9 +84,15 @@ impl App {
     /// Splits an area using the main app layout and returns the
     /// resulting areas
     pub fn split_area(&self, area: layout::Rect) -> Rc<[layout::Rect]> {
+        let file_input_open = self.ui_state.file_input.is_some();
+
+        // if a file input is rendered in the status bar, an additional border
+        // is rendered
+        let status_bar_height = if file_input_open { 3 } else { 2 };
+
         Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Max(5)])
+            .constraints([Constraint::Min(1), Constraint::Max(status_bar_height)])
             .split(area)
     }
 
@@ -204,6 +210,16 @@ impl App {
         }
     }
 
+    /// Open a file input with the given contents and store it in UIState
+    fn open_file_input(&mut self, contents: &str) {
+        self.ui_state.file_input = Some(contents.into());
+    }
+
+    /// Close the currently open file input
+    fn close_file_input(&mut self) {
+        self.ui_state.file_input = None;
+    }
+
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key) => self.handle_key_event(key),
@@ -246,7 +262,7 @@ impl App {
                 Ok(())
             }
             KeyCode::Char('n') => {
-                self.ui_state.file_input = Some(tui_input::Input::default());
+                self.open_file_input("");
                 Ok(())
             }
             KeyCode::Left => {
@@ -302,13 +318,14 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
 
-    use ratatui::{
-        buffer::Buffer,
-        layout::{Position as TerminalPosition, Rect},
-    };
+    use ratatui::{buffer::Buffer, layout::Rect};
     use tempfile::NamedTempFile;
+    use tui_input::InputRequest;
 
-    use crate::test_util::temp_file_with_contents;
+    use crate::test_util::{
+        temp_file_with_contents,
+        ui::{n_spaces, solid_border},
+    };
 
     use super::App;
 
@@ -325,17 +342,6 @@ mod tests {
         let file = temp_file_with_contents(contents);
         let filename = file.path().to_str().unwrap().to_string();
         app_with_file(filename)
-    }
-
-    /// Return a string representation of a solid border of a given length.
-    fn solid_border(length: usize) -> String {
-        "─".repeat(length)
-    }
-
-    /// Return a string representation of a line filled with
-    /// spaces of a given length
-    fn n_spaces(n: usize) -> String {
-        String::from(" ").repeat(n)
     }
 
     /// Used in unit tests to provide the UI element, based on which the cursor
@@ -362,9 +368,12 @@ mod tests {
                 ),
             ),
 
-            CursorRenderingWidget::FileInput => {
-                todo!();
-            }
+            CursorRenderingWidget::FileInput => app.ccrp_based_on_file_input(
+                buf.area,
+                app.ui_state.file_input.as_ref().expect(
+                    "A file input should be open when testing where to put the cursor inside it",
+                ),
+            ),
         };
 
         assert_eq!(pos, expected.into());
@@ -379,16 +388,23 @@ mod tests {
         assert_cursor_render_pos(app, buf, CursorRenderingWidget::CurrentBuffer, expected);
     }
 
+    fn acrp_based_on_file_input(
+        app: &mut App,
+        buf: &ratatui::buffer::Buffer,
+        expected: (u16, u16),
+    ) {
+        assert_cursor_render_pos(app, buf, CursorRenderingWidget::FileInput, expected);
+    }
+
     /// Helper function to verify cursor position and buffer rendering.
     fn assert_cursor_and_buffer(
         app: &mut App,
         buf: &mut Buffer,
-        renderer: CursorRenderingWidget,
-        expected_cursor_pos: TerminalPosition,
+        expected_cursor_pos: (u16, u16),
         expected_lines: Vec<&str>,
     ) {
         // Verify cursor position.
-        assert_cursor_render_pos(app, buf, renderer, expected_cursor_pos.into());
+        acrp_based_on_current_buffer(app, buf, expected_cursor_pos);
 
         // Verify buffer contents.
         let expected_buffer = Buffer::with_lines(
@@ -399,18 +415,6 @@ mod tests {
         );
         app.render_buffer_contents(buf.area, buf);
         assert_eq!(*buf, expected_buffer);
-    }
-
-    /// Shorthand for defining the renderer in unit tests and calling assert_cursor_and_buffer
-    /// with it multiple times when testing for the cursor position in a buffer
-    fn acab_based_on_current_buffer(
-        app: &mut App,
-        buf: &mut Buffer,
-        expected_cursor_pos: TerminalPosition,
-        expected_lines: Vec<&str>,
-    ) {
-        let renderer = CursorRenderingWidget::CurrentBuffer;
-        assert_cursor_and_buffer(app, buf, renderer, expected_cursor_pos, expected_lines);
     }
 
     #[test]
@@ -488,11 +492,11 @@ mod tests {
 
         // Verify initial buffer rendering after the first cursor move.
         app.backend.move_cursor_right();
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["2", "5"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["2", "5"]);
 
         // Verify buffer rendering after the second cursor move.
         app.backend.move_cursor_right();
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["3", "6"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["3", "6"]);
     }
 
     /// When the buffer gets shifted right, it should not shift back
@@ -502,7 +506,7 @@ mod tests {
     fn test_buffer_does_not_shift_left_until_necessary() {
         let mut app = app_with_file_contents("1234");
         let mut buf = Buffer::empty(Rect::new(0, 0, 2, 1));
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["12"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["12"]);
 
         // Move the cursor to the last char, shifting the buffer
         app.backend.move_cursor_right();
@@ -510,17 +514,17 @@ mod tests {
         app.backend.move_cursor_right();
 
         // Verify initial buffer rendering after the first cursor move.
-        acab_based_on_current_buffer(&mut app, &mut buf, (1, 0).into(), vec!["34"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (1, 0), vec!["34"]);
 
         // Move left
         app.backend.move_cursor_left();
 
         // The cursor should now point at 3 and be at (0, 0)
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["34"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["34"]);
 
         // Move left, the buffer should shift left
         app.backend.move_cursor_left();
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["23"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["23"]);
     }
 
     /// The buffer contents should shift down so that lines that
@@ -532,11 +536,11 @@ mod tests {
 
         // Verify initial buffer rendering after the first cursor move.
         app.backend.move_cursor_down();
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["456"]);
 
         // Verify buffer rendering after the second cursor move.
         app.backend.move_cursor_down();
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["789"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["789"]);
     }
 
     /// When the buffer gets shifted down, it should not shift back
@@ -546,25 +550,54 @@ mod tests {
     fn test_buffer_does_not_shift_up_until_necessary() {
         let mut app = app_with_file_contents("123\n456\n789");
         let mut buf = Buffer::empty(Rect::new(0, 0, 3, 2));
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["123", "456"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["123", "456"]);
 
         // Move the cursor to the last line, shifting the buffer
         app.backend.move_cursor_down();
         app.backend.move_cursor_down();
 
         // Verify initial buffer rendering after the first cursor move.
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 1).into(), vec!["456", "789"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 1), vec!["456", "789"]);
 
         // Move up
         app.backend.move_cursor_up();
 
         // The cursor should now point at 4 and be at (0, 0)
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["456", "789"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["456", "789"]);
 
         // Move up, the buffer should shift up
         app.backend.move_cursor_up();
-        acab_based_on_current_buffer(&mut app, &mut buf, (0, 0).into(), vec!["123", "456"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["123", "456"]);
     }
 
-    // TODO: file input cursor and text displaying unit tests
+    #[test]
+    fn test_cursor_position_file_input() {
+        let mut app = app_with_file_contents("");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
+
+        app.open_file_input("");
+        acrp_based_on_file_input(&mut app, &buf, (1, 1));
+
+        // Insert a char
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::InsertChar('h'));
+
+        // Delete a char
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::DeletePrevChar);
+
+        acrp_based_on_file_input(&mut app, &buf, (1, 1));
+
+        // Now some overflow
+        let buf = Buffer::empty(Rect::new(0, 0, 4, 1));
+        app.open_file_input("hello, world!");
+        // Does not reach (3, 1) because of the border
+        acrp_based_on_file_input(&mut app, &buf, (2, 1))
+    }
 }

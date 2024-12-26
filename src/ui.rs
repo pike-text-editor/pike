@@ -178,3 +178,43 @@ impl StatefulWidget for FileInput {
         widget.render(area, buf)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ratatui::{buffer, layout, widgets::StatefulWidget};
+
+    use crate::test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border};
+
+    use super::FileInput;
+    // TODO: could move some BufferDisplay tests here for clarity
+
+    #[test]
+    fn file_input_displays_input() {
+        let mut input: tui_input::Input = "hello".into();
+        let mut buf = buffer::Buffer::empty(layout::Rect::new(0, 0, 10, 3));
+
+        let widget = FileInput::default();
+        widget.render(buf.area, &mut buf, &mut input);
+
+        // Skip the borders, we're not testing the library
+        let text_line = nth_line_from_terminal_buffer(&buf, 1);
+
+        assert_eq!(
+            text_line,
+            vertical_border() + "hello" + &n_spaces(3) + &vertical_border()
+        );
+
+        // Insert an additional character
+        let request = tui_input::InputRequest::InsertChar(',');
+        input.handle(request);
+
+        let widget = FileInput::default();
+        widget.render(buf.area, &mut buf, &mut input);
+        let text_line = nth_line_from_terminal_buffer(&buf, 1);
+
+        assert_eq!(
+            text_line,
+            vertical_border() + "hello," + &n_spaces(2) + &vertical_border()
+        );
+    }
+}
