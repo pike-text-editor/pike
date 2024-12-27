@@ -1,9 +1,9 @@
-use std::{io, path::PathBuf, rc::Rc};
+use std::{env, io, path::PathBuf, process, rc::Rc};
 
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use ratatui::{
-    layout::{self, Constraint, Direction, Layout, Position as TerminalPosition},
+    layout::{Constraint, Direction, Layout, Position as TerminalPosition, Rect},
     prelude::Backend,
     text::Text,
     widgets::{Block, Borders, Paragraph, StatefulWidget, Widget, Wrap},
@@ -27,10 +27,10 @@ pub struct App {
 #[allow(dead_code, unused_variables, unused_mut)]
 impl App {
     pub fn build(args: Args) -> App {
-        let cwd = std::env::current_dir().map_err(|_| "Failed to get current working directory");
+        let cwd = env::current_dir().map_err(|_| "Failed to get current working directory");
         if cwd.is_err() {
             eprintln!("{}", cwd.err().unwrap());
-            std::process::exit(1);
+            process::exit(1);
         }
 
         let config_path = args.config.map(PathBuf::from);
@@ -43,7 +43,7 @@ impl App {
             Ok(backend) => App::new(backend),
             Err(err) => {
                 eprintln!("{}", err);
-                std::process::exit(1);
+                process::exit(1);
             }
         }
     }
@@ -87,7 +87,7 @@ impl App {
 
     /// Splits an area using the main app layout and returns the
     /// resulting areas
-    pub fn split_area(&self, area: layout::Rect) -> Rc<[layout::Rect]> {
+    pub fn split_area(&self, area: Rect) -> Rc<[Rect]> {
         let file_input_open = self.ui_state.file_input.is_some();
 
         // if a file input is rendered in the status bar, an additional border
@@ -101,7 +101,7 @@ impl App {
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
-    fn render_buffer_contents(&mut self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
+    fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         let buffer_contents = &self.backend.current_buffer_contents();
         let cursor_position = self.backend.cursor_position();
         let offset = &mut self.ui_state.buffer_offset;
@@ -110,7 +110,7 @@ impl App {
     }
 
     /// Render the status bar in a given Rect
-    fn render_status_bar(&self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
+    fn render_status_bar(&self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         // TODO: come back to this when text insertion is implemented to display saved/unsaved
         // changes info
         let filename = self.backend.current_buffer_filename();
@@ -128,7 +128,7 @@ impl App {
     }
 
     /// Render the file input in a given Rect
-    fn render_file_input(&mut self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
+    fn render_file_input(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         FileInput::default().render(
             area,
             buf,
@@ -143,10 +143,7 @@ impl App {
     /// Subject to changing when handling more input scenarios, only works
     /// when editing the current buffer. Self has to be mutable here, since
     /// UIState is modified when calculating the cursor position
-    pub fn calculate_cursor_render_position(
-        &mut self,
-        layout: &Rc<[layout::Rect]>,
-    ) -> TerminalPosition {
+    pub fn calculate_cursor_render_position(&mut self, layout: &Rc<[Rect]>) -> TerminalPosition {
         // Indices for clarity
         let main_area = 1;
         let status_bar_area = 0;
@@ -165,11 +162,7 @@ impl App {
     }
 
     /// Calculate the position to render the cursor at based on the file input
-    fn ccrp_based_on_file_input(
-        &self,
-        area: layout::Rect,
-        input: &tui_input::Input,
-    ) -> TerminalPosition {
+    fn ccrp_based_on_file_input(&self, area: Rect, input: &tui_input::Input) -> TerminalPosition {
         let border_offset = 1;
 
         let max_x = {
@@ -198,11 +191,7 @@ impl App {
     }
 
     /// Calculate the position to render the cursor at based on the current buffer
-    fn ccrp_based_on_buffer(
-        &self,
-        area: layout::Rect,
-        buffer: &scribe::Buffer,
-    ) -> TerminalPosition {
+    fn ccrp_based_on_buffer(&self, area: Rect, buffer: &scribe::Buffer) -> TerminalPosition {
         let (max_x, max_y) = Self::max_rect_position(&area);
         let (base_x, base_y) = Self::base_rect_position(&area);
 
@@ -450,11 +439,7 @@ mod tests {
         assert_cursor_render_pos(app, buf, CursorRenderingWidget::CurrentBuffer, expected);
     }
 
-    fn acrp_based_on_file_input(
-        app: &mut App,
-        buf: &ratatui::buffer::Buffer,
-        expected: (u16, u16),
-    ) {
+    fn acrp_based_on_file_input(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
         assert_cursor_render_pos(app, buf, CursorRenderingWidget::FileInput, expected);
     }
 

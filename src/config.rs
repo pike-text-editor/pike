@@ -5,6 +5,7 @@ use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -49,8 +50,8 @@ impl Config {
     pub fn from_file(path: Option<&Path>) -> Result<Config, String> {
         match path {
             Some(path) => {
-                let contents = std::fs::read_to_string(path)
-                    .map_err(|e| format!("Error reading file: {e}"))?;
+                let contents =
+                    fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
                 Config::from_toml_representation(&contents)
             }
             None => Ok(Config::default()),
@@ -158,7 +159,7 @@ mod config_test {
 
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::operations::Operation;
+    use crate::{config::default_config_path, operations::Operation};
 
     use super::{Config, KeyShortcut};
 
@@ -316,7 +317,7 @@ mod config_test {
     #[test]
     fn test_default_config_path() {
         let expected = dirs::config_dir().unwrap().join("pike.toml");
-        let actual = super::default_config_path().expect("Failed to get default config path");
+        let actual = default_config_path().expect("Failed to get default config path");
         assert_eq!(expected, actual);
     }
 }
