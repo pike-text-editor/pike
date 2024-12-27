@@ -1,7 +1,7 @@
 use std::{io, path::PathBuf, rc::Rc};
 
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use ratatui::{
     layout::{self, Constraint, Direction, Layout, Position as TerminalPosition},
     prelude::Backend,
@@ -178,10 +178,12 @@ impl App {
         TerminalPosition::new(min(base_x + offset, max_x), base_y + border_offset)
     }
 
+    /// Calculate the maximum renderable position in a given area
     fn max_rect_position(area: &ratatui::prelude::Rect) -> (u16, u16) {
         (area.width - 1, area.height - 1)
     }
 
+    /// Calculate the maximum renderable position in a given area
     fn base_rect_position(area: &ratatui::prelude::Rect) -> (u16, u16) {
         (area.x, area.y)
     }
@@ -245,15 +247,60 @@ impl App {
         todo!()
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
-        if let Some(input) = &mut self.ui_state.file_input {
-            if let (KeyCode::Char(chr), event::KeyModifiers::NONE) = (key.code, key.modifiers) {
-                let request = tui_input::InputRequest::InsertChar(chr);
-                let response = input.handle(request);
-                if response.is_some() {
-                    return Ok(());
-                }
+    /// Try to handle the key press using a file input. Returns a boolean
+    /// indicating whether the event has been handled or not.
+    fn handle_key_press_with_file_input(&mut self, key: KeyEvent) -> bool {
+        // No input means the event can't be handled
+        let input = match self.ui_state.file_input.as_mut() {
+            Some(input) => input,
+            None => return false,
+        };
+
+        // Open a new file and close the input
+        if (key.code, key.modifiers) == (KeyCode::Enter, KeyModifiers::NONE) {
+            let path = PathBuf::from(input.to_string());
+            self.backend
+                .create_and_open_file(&path)
+                // TODO: display message in the UI
+                .expect("Error opening file!");
+            self.close_file_input();
+            return true;
+        }
+
+        // Try to create a request to the file input and handle it
+        match Self::key_event_to_input_request(key) {
+            Some(request) => {
+                input.handle(request);
+                true
             }
+            None => false,
+        }
+    }
+
+    /// Try to convert a given key event to an InputRequest to be sent to a tui_input::Input
+    /// instance.
+    fn key_event_to_input_request(key: KeyEvent) -> Option<tui_input::InputRequest> {
+        match (key.code, key.modifiers) {
+            (KeyCode::Char(chr), KeyModifiers::NONE) => {
+                Some(tui_input::InputRequest::InsertChar(chr))
+            }
+            (KeyCode::Char(chr), KeyModifiers::SHIFT) => {
+                Some(tui_input::InputRequest::InsertChar(chr))
+            }
+            (KeyCode::Backspace, KeyModifiers::NONE) => {
+                Some(tui_input::InputRequest::DeletePrevChar)
+            }
+            (KeyCode::Delete, KeyModifiers::NONE) => Some(tui_input::InputRequest::DeleteNextChar),
+            (KeyCode::Left, KeyModifiers::NONE) => Some(tui_input::InputRequest::GoToPrevChar),
+            (KeyCode::Right, KeyModifiers::NONE) => Some(tui_input::InputRequest::GoToNextChar),
+            _ => None,
+        }
+    }
+
+    fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
+        // Try to handle the event using a file input
+        if self.handle_key_press_with_file_input(key) {
+            return Ok(());
         }
 
         match key.code {
@@ -585,7 +632,24 @@ mod tests {
             .expect("A file input has been opened, it can't be none")
             .handle(InputRequest::InsertChar('h'));
 
-        // Delete a char
+        acrp_based_on_file_input(&mut app, &buf, (2, 1));
+
+        // Move cursor left
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::GoToPrevChar);
+
+        acrp_based_on_file_input(&mut app, &buf, (1, 1));
+
+        // And right, then delete a char
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::GoToNextChar);
+
         app.ui_state
             .file_input
             .as_mut()
