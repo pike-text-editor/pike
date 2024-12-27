@@ -74,8 +74,12 @@ impl App {
         let status_bar_area = layout[1];
 
         self.render_buffer_contents(main_area, frame.buffer_mut());
-        self.render_status_bar(status_bar_area, frame.buffer_mut());
-        self.render_file_input(status_bar_area, frame.buffer_mut());
+
+        if let Some(input) = &self.ui_state.file_input {
+            self.render_file_input(status_bar_area, frame.buffer_mut());
+        } else {
+            self.render_status_bar(status_bar_area, frame.buffer_mut());
+        }
 
         let cursor_position = self.calculate_cursor_render_position(&layout);
         self.render_cursor(frame, cursor_position);
@@ -125,9 +129,14 @@ impl App {
 
     /// Render the file input in a given Rect
     fn render_file_input(&mut self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
-        if let Some(input) = &mut self.ui_state.file_input {
-            FileInput::default().render(area, buf, input);
-        }
+        FileInput::default().render(
+            area,
+            buf,
+            self.ui_state
+                .file_input
+                .as_mut()
+                .expect("None case has been handled"),
+        );
     }
 
     /// Get the position to render the cursor at in the current buffer.
@@ -263,6 +272,12 @@ impl App {
                 .create_and_open_file(&path)
                 // TODO: display message in the UI
                 .expect("Error opening file!");
+            self.close_file_input();
+            return true;
+        }
+
+        // Close the input
+        if (key.code, key.modifiers) == (KeyCode::Esc, KeyModifiers::NONE) {
             self.close_file_input();
             return true;
         }
