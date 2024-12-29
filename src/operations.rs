@@ -19,6 +19,8 @@ pub enum Operation {
 
     FindFilesInCWD,
     FindTextInCWD,
+
+    Quit,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -38,6 +40,7 @@ impl Operation {
             "redo" => Operation::Redo,
             "find_files_in_cwd" => Operation::FindFilesInCWD,
             "find_text_in_cwd" => Operation::FindTextInCWD,
+            "quit" => Operation::Quit,
             _ => return Err(format!("Invalid operation in config: {query}")),
         };
         Ok(return_value)

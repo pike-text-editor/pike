@@ -163,6 +163,10 @@ impl Default for Config {
                 ),
                 Operation::FindTextInCWD,
             ),
+            (
+                KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+                Operation::Quit,
+            ),
         ]);
 
         Config { key_mappings }
@@ -249,6 +253,10 @@ mod config_test {
                     KeyModifiers::SHIFT | KeyModifiers::CONTROL,
                 ),
                 Operation::FindTextInCWD,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+                Operation::Quit,
             ),
         ]);
         assert_eq!(expected, actual);

@@ -371,12 +371,16 @@ impl App {
     }
 
     /// Tries to match the given key event to a registered keybind and handle it.
-    fn handle_keybind(&self, key: KeyEvent) -> bool {
+    fn handle_keybind(&mut self, key: KeyEvent) -> bool {
         if let Some(op) = self.backend.get_keymap(&key.into()) {
             match op {
-                Operation::CreateNewFile => todo!("Handle CreateNewFile operation"),
-                Operation::OpenFile => todo!("Handle OpenFile operation"),
-
+                Operation::OpenFile => {
+                    self.open_file_input("");
+                }
+                Operation::Quit => {
+                    self.exit();
+                    return true;
+                }
                 Operation::CreateNewBuffer => todo!("Handle CreateNewBuffer operation"),
                 Operation::SwitchToPreviousBuffer => {
                     todo!("Handle SwitchToPreviousBuffer operation")
