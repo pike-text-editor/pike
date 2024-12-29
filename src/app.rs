@@ -386,7 +386,6 @@ impl App {
                     todo!("Handle SwitchToPreviousBuffer operation")
                 }
                 Operation::SwitchToNextBuffer => todo!("Handle SwitchToNextBuffer operation"),
-                Operation::OpenBufferPicker => todo!("Handle OpenBufferPicker operation"),
 
                 Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
                 Operation::SearchAndReplaceInCurrentBuffer => {
@@ -398,8 +397,10 @@ impl App {
                 Operation::Undo => todo!("Handle Undo operation"),
                 Operation::Redo => todo!("Handle Redo operation"),
 
+                // WARN: these probably won't be supported
                 Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
                 Operation::FindTextInCWD => todo!("Handle FindTextInCWD operation"),
+                Operation::OpenBufferPicker => todo!("Handle OpenBufferPicker operation"),
             }
             true
         } else {
