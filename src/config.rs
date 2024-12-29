@@ -24,7 +24,7 @@ pub fn default_config_path() -> Result<PathBuf, String> {
 /// Editor configuration
 #[derive(Debug, PartialEq, Eq)]
 pub struct Config {
-    key_mappings: HashMap<KeyShortcut, Operation>,
+    pub key_mappings: HashMap<KeyShortcut, Operation>,
 }
 
 #[allow(dead_code)]

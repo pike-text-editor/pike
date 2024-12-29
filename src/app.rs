@@ -12,6 +12,7 @@ use ratatui::{
 use std::cmp::min;
 
 use crate::{
+    operations::Operation,
     pike::Pike,
     ui::{BufferDisplay, FileInput, UIState},
 };
@@ -318,6 +319,10 @@ impl App {
             return Ok(());
         }
 
+        if self.handle_keybind(key) {
+            return Ok(());
+        }
+
         match key.code {
             KeyCode::Char('q') => {
                 self.exit();
@@ -363,6 +368,39 @@ impl App {
     /// Open a text finder in the current working directory
     fn find_words_in_cwd() {
         todo!()
+    }
+
+    /// Tries to match the given key event to a registered keybind and handle it.
+    fn handle_keybind(&self, key: KeyEvent) -> bool {
+        if let Some(op) = self.backend.get_keymap(&key.into()) {
+            match op {
+                Operation::CreateNewFile => todo!("Handle CreateNewFile operation"),
+                Operation::OpenFile => todo!("Handle OpenFile operation"),
+
+                Operation::CreateNewBuffer => todo!("Handle CreateNewBuffer operation"),
+                Operation::SwitchToPreviousBuffer => {
+                    todo!("Handle SwitchToPreviousBuffer operation")
+                }
+                Operation::SwitchToNextBuffer => todo!("Handle SwitchToNextBuffer operation"),
+                Operation::OpenBufferPicker => todo!("Handle OpenBufferPicker operation"),
+
+                Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
+                Operation::SearchAndReplaceInCurrentBuffer => {
+                    todo!("Handle SearchAndReplaceInCurrentBuffer operation")
+                }
+
+                Operation::SaveBufferToFile => todo!("Handle SaveBufferToFile operation"),
+
+                Operation::Undo => todo!("Handle Undo operation"),
+                Operation::Redo => todo!("Handle Redo operation"),
+
+                Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
+                Operation::FindTextInCWD => todo!("Handle FindTextInCWD operation"),
+            }
+            true
+        } else {
+            false
+        }
     }
 }
 
