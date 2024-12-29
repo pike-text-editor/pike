@@ -39,7 +39,24 @@ impl Config {
 
         if let Some(keymap_table) = parsed.get("keymaps").and_then(|keys| keys.as_table()) {
             let keymap_pairs = Config::keymap_pairs_from_toml_table(keymap_table)?;
-            return_value.key_mappings.extend(keymap_pairs);
+
+            // Reverse the key_mappings (switch KeyShortcut and Operation)
+            let mut reversed_keymaps: HashMap<Operation, KeyShortcut> = return_value
+                .key_mappings
+                .iter()
+                .map(|(sh, op)| (op.clone(), sh.clone()))
+                .collect();
+
+            // Extend the reversed keymap with new keymap pairs
+            for (op, sh) in keymap_pairs {
+                reversed_keymaps.insert(op, sh);
+            }
+
+            // Rebuild the key_mappings with reversed keys and operations
+            return_value.key_mappings = reversed_keymaps
+                .into_iter()
+                .map(|(op, sh)| (sh, op))
+                .collect();
         }
 
         Ok(return_value)
@@ -62,8 +79,8 @@ impl Config {
     /// over the default configuration
     fn keymap_pairs_from_toml_table(
         table: &Table,
-    ) -> Result<Vec<(KeyShortcut, Operation)>, String> {
-        let mut return_value = Vec::<(KeyShortcut, Operation)>::new();
+    ) -> Result<Vec<(Operation, KeyShortcut)>, String> {
+        let mut return_value = Vec::<(Operation, KeyShortcut)>::new();
         let mut seen_shortcuts = HashSet::<KeyShortcut>::new();
         let mut seen_operations = HashSet::<Operation>::new();
 
@@ -80,7 +97,7 @@ impl Config {
                 return Err(format!("Duplicate keymap operation found: {:?}", op));
             }
 
-            return_value.push((shortcut, op));
+            return_value.push((op, shortcut));
         }
         Ok(return_value)
     }
@@ -166,7 +183,7 @@ mod config_test {
     fn from_toml_keymap_section_valid_case() {
         let keymap_section = r#"
             [keymaps]
-            "ctrl+shift+x" = "new_file"
+            "ctrl+shift+x" = "open_file"
             "#;
 
         let actual = Config::from_toml_representation(keymap_section)
@@ -178,10 +195,6 @@ mod config_test {
                     KeyCode::Char('x'),
                     KeyModifiers::SHIFT | KeyModifiers::CONTROL,
                 ),
-                Operation::CreateNewFile,
-            ),
-            (
-                KeyShortcut::new(KeyCode::Char('o'), KeyModifiers::CONTROL),
                 Operation::OpenFile,
             ),
             (

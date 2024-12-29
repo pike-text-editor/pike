@@ -2,7 +2,6 @@
 /// Every keymappable operation within pike
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Operation {
-    CreateNewFile,
     OpenFile,
 
     CreateNewBuffer,
@@ -27,7 +26,6 @@ impl Operation {
     /// Creates a new Operation from a string from a config file
     pub fn from_string(query: &str) -> Result<Operation, String> {
         let return_value = match query {
-            "new_file" => Operation::CreateNewFile,
             "open_file" => Operation::OpenFile,
             "new_buffer" => Operation::CreateNewBuffer,
             "previous_buffer" => Operation::SwitchToPreviousBuffer,
