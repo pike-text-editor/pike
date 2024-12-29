@@ -7,15 +7,16 @@ pub struct KeyShortcut {
     pub modifiers: KeyModifiers,
 }
 
+impl From<KeyEvent> for KeyShortcut {
+    fn from(event: KeyEvent) -> Self {
+        KeyShortcut::new(event.code, event.modifiers)
+    }
+}
+
 #[allow(dead_code)]
 impl KeyShortcut {
     pub fn new(code: KeyCode, modifiers: KeyModifiers) -> KeyShortcut {
         KeyShortcut { code, modifiers }
-    }
-
-    /// Creates a new KeyShortcut from a crossterm::event::KeyEvent
-    pub fn from_key_event(event: &KeyEvent) -> KeyShortcut {
-        KeyShortcut::new(event.code, event.modifiers)
     }
 
     /// Creates a new KeyShortcut based on a string from a config file.
@@ -133,7 +134,7 @@ mod key_shortcut_test {
             (KeyEvent::new(KeyCode::F(1), KeyModifiers::SHIFT)),
         ];
 
-        let shortcuts = events.map(|event| KeyShortcut::from_key_event(&event));
+        let shortcuts: [KeyShortcut; 7] = events.map(|event| event.into());
 
         for (event, shortcut) in events.iter().zip(shortcuts.iter()) {
             assert_eq!(
