@@ -4,7 +4,7 @@ use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
     layout::{self, Constraint, Direction, Layout, Position as TerminalPosition},
-    prelude::Backend,
+    prelude::{Backend, StatefulWidget},
     text::Text,
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
     Terminal,
@@ -12,7 +12,7 @@ use ratatui::{
 
 use crate::{
     pike::Pike,
-    ui::{BufferDisplayWidget, UIState},
+    ui::{BufferDisplayOffset, BufferDisplayState, BufferDisplayWidget, UIState},
 };
 
 /// TUI application which displays the UI and handles events
@@ -48,10 +48,17 @@ impl App {
     }
 
     fn new(backend: Pike) -> App {
+        let buffer_contents = backend.current_buffer_contents();
+        let cursor_position = backend.cursor_position();
+        let offset = BufferDisplayOffset::default();
+        let buffer_state = BufferDisplayState::new(buffer_contents, cursor_position, offset);
+
+        let ui_state = UIState { buffer_state };
+
         App {
             exit: false,
             backend,
-            ui_state: UIState::default(),
+            ui_state,
         }
     }
 
@@ -80,11 +87,13 @@ impl App {
 
     /// Render the contents of the currently opened buffer in a given Rect
     fn render_buffer_contents(&mut self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let buffer_contents = &self.backend.current_buffer_contents();
-        let cursor_position = self.backend.cursor_position();
-        let offset = &mut self.ui_state.buffer_offset;
-        let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
-        buffer_widget.render(area, buf);
+        // 1) Sync the in-memory state with the backend’s latest data
+        self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
+        self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
+
+        // 2) Render using our new StatefulWidget
+        let widget = BufferDisplayWidget;
+        widget.render(area, buf, &mut self.ui_state.buffer_state);
     }
 
     /// Render the status bar in a given Rect
@@ -102,45 +111,16 @@ impl App {
 
     /// Renders the cursor in the current buffer
     fn render_cursor(&mut self, area: layout::Rect, frame: &mut ratatui::prelude::Frame) {
-        // TODO: probably should be split up so self is not mutable
-        if let Some(position) = self.backend.cursor_position() {
-            let cursor_position = self.calculate_cursor_render_position(area);
-            frame.set_cursor_position(cursor_position);
-        }
-    }
+        // Also sync state with backend
+        self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
+        self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
 
-    /// Get the position to render the cursor at in the current buffer.
-    /// Subject to changing when handling more input scenarios, only works
-    /// when editing the current buffer. Self has to be mutable here, since
-    /// UIState is modified when calculating the cursor position
-    pub fn calculate_cursor_render_position(&mut self, area: layout::Rect) -> TerminalPosition {
-        // TODO: this is an ugly hack. an instance of a widget which is dropped at the end of this
-        // function should not have to be created, this should probably be a widget ref stored in
-        // the UI state, so that it can be used in multiple places without having to be rebuilt
-        // each time. This will be a separate issue.
-        //
-        // The problem is:
-        //  * the cursor rendering position has to be calculated by the widget that currently owns
-        //  it, since it relies on some widget state specific info, like UIState.buffer_offset.
-        //  * the widgets should be wrapped in separate methods so that app.draw is not 200 lines
-        //  long and messy, as it is now, which does not let us access the widgets directly.
-        //  * in order to draw the cursor, access to the frame is required directly, which
-        //  is not provided to the render_buffer_contents, etc methods, since they're supposed
-        //  to render in a buffer to be unit tested easily.
-        //
-        //  So, we need to calculate the position "above" the functions that create and render the
-        //  widgets, but we need the widgets themselves for this to be done. The app should
-        //  probably just check what is being done and call the correct handler to calculate the
-        //  cursor rendering position for it.
-        //
-        //  This is not a large overhead, since it's just creating one more object which does not
-        //  copy any data, but it's ugly and stinks
-        let buffer_contents = &self.backend.current_buffer_contents();
-        let cursor_position = self.backend.cursor_position();
-        let offset = &mut self.ui_state.buffer_offset;
-
-        let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
-        buffer_widget.calculate_cursor_render_position(area)
+        // Then just compute the cursor position
+        let pos = self
+            .ui_state
+            .buffer_state
+            .calculate_cursor_render_position(area);
+        frame.set_cursor_position(pos);
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -302,12 +282,21 @@ mod tests {
     }
 
     /// Helper function to assert the position to render the cursor at in the visible
-    /// buffer
+    /// buffer after syncing the buffer contents and cursor position from the backend.
     fn assert_cursor_render_pos(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
-        let pos = app.calculate_cursor_render_position(buf.area);
+        // 1) Sync the in-memory state with the backend’s latest data
+        app.ui_state.buffer_state.buffer_contents = app.backend.current_buffer_contents();
+        app.ui_state.buffer_state.cursor_position = app.backend.cursor_position();
+
+        // 2) Compute the cursor position from the state
+        let pos = app
+            .ui_state
+            .buffer_state
+            .calculate_cursor_render_position(buf.area);
+
+        // 3) Verify
         assert_eq!(pos, expected.into());
     }
-
     /// The cursor should not move past the bounds of the buffer
     #[test]
     fn test_cant_move_cursor_too_far_right() {
