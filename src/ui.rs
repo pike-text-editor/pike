@@ -37,6 +37,7 @@ impl BufferDisplayOffset {
     }
 }
 
+#[derive(Default)]
 pub struct BufferDisplayState {
     pub buffer_contents: String,
     pub cursor_position: Option<BufferPosition>,
@@ -86,8 +87,9 @@ impl BufferDisplayState {
     }
 
     /// Shifts the content of the buffer down by the offset and returns the resulting string.
-    fn shift_contents_down(&self) -> String {
-        self.buffer_contents
+    /// Basically removes the first self.offset.y lines and joins the remanining ones.
+    fn shift_contents_down(&mut self, contents: String) -> String {
+        contents
             .lines()
             .skip(self.offset.y)
             .collect::<Vec<&str>>()
@@ -95,18 +97,22 @@ impl BufferDisplayState {
     }
 
     /// Shifts the content of the buffer to the right by the offset and returns the resulting
-    /// string.
-    fn shift_contents_right(&self) -> String {
-        self.buffer_contents
+    /// string. Basically, takes every line and removes line[0:self.offset.x] from it, then
+    /// joins and returns them.
+    fn shift_contents_right(&mut self, contents: String) -> String {
+        contents
             .lines()
-            .map(|line| line.chars().skip(self.offset.x).collect::<String>())
+            .map(|line| {
+                let line = line.chars().skip(self.offset.x).collect::<String>();
+                line
+            })
             .collect::<Vec<String>>()
             .join("\n")
     }
 
-    fn shift_contents(&self) -> String {
-        self.shift_contents_right();
-        self.shift_contents_down()
+    fn shift_contents(&mut self, contents: String) -> String {
+        let down_shifted = self.shift_contents_down(contents);
+        self.shift_contents_right(down_shifted)
     }
 
     /// Calculates the render position of the cursor in the given rect.
@@ -140,6 +146,7 @@ impl BufferDisplayState {
 /// Holds the information about the current state of the UI
 /// of the app.
 #[allow(dead_code)]
+#[derive(Default)]
 pub struct UIState {
     /// Offset of the currently rendered buffer
     pub buffer_state: BufferDisplayState,
@@ -160,7 +167,7 @@ impl StatefulWidget for BufferDisplayWidget {
     /// Render the widget. Notice that `render` here includes a `state` parameter
     /// which you can use if you need separate "runtime" state.
     fn render(
-        mut self,
+        self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
@@ -170,7 +177,7 @@ impl StatefulWidget for BufferDisplayWidget {
         state.update_y_offset(area);
 
         // Shift contents based on offset
-        let shifted_contents = state.shift_contents();
+        let shifted_contents = state.shift_contents(state.buffer_contents.clone());
         // Render the text using Paragraph
         let text_widget = Text::from(shifted_contents);
         let paragraph_widget = Paragraph::new(text_widget);
