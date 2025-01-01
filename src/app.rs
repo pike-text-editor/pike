@@ -381,7 +381,9 @@ impl App {
                     self.exit();
                     return true;
                 }
-                Operation::CreateNewBuffer => todo!("Handle CreateNewBuffer operation"),
+                Operation::CreateNewBuffer => {
+                    self.backend.open_new_buffer();
+                }
                 Operation::SwitchToPreviousBuffer => {
                     todo!("Handle SwitchToPreviousBuffer operation")
                 }
