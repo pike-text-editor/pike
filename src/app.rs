@@ -423,6 +423,7 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
 
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use ratatui::{buffer::Buffer, layout::Rect};
     use tempfile::NamedTempFile;
     use tui_input::InputRequest;
@@ -447,6 +448,16 @@ mod tests {
         let file = temp_file_with_contents(contents);
         let filename = file.path().to_str().unwrap().to_string();
         app_with_file(filename)
+    }
+
+    /// Create an App instance with a given config
+    fn app_with_config(config_contents: &str) -> App {
+        let config_file = temp_file_with_contents(config_contents);
+        let filename = config_file.path().to_str().unwrap().to_string();
+        App::build(super::Args {
+            config: Some(filename),
+            file: None,
+        })
     }
 
     /// Used in unit tests to provide the UI element, based on which the cursor
@@ -721,5 +732,26 @@ mod tests {
         app.open_file_input("hello, world!");
         // Does not reach (3, 1) because of the border
         acrp_based_on_file_input(&mut app, &buf, (2, 1))
+    }
+
+    #[test]
+    fn test_app_handles_keybinds() {
+        let config = r#"
+            [keymaps]
+            "ctrl+a" = "open_file"
+            "#;
+        let mut app = app_with_config(config);
+
+        // A custom and a default keybind
+        let open_file_event = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
+        let close_event = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL);
+
+        app.handle_key_event(open_file_event)
+            .expect("Failed to handle key event");
+        assert!(app.ui_state.file_input.is_some());
+
+        app.handle_key_event(close_event)
+            .expect("Failed to handle key event");
+        assert!(app.exit)
     }
 }
