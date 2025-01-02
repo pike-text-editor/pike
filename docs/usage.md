@@ -16,22 +16,18 @@ are defined as key-value pairs. Example:
 
 The following actions are bindable:
 
-| Action | Description | Default | Config definition |
-| --------------- | --------------- | --------------- | --------------- |
-| Open file | Item2.1 | Item3.1 | Item4.1 |
-| Open new buffer | Item2.2 | Item3.2 | Item4.2 |
-| Switch to next buffer | Item2.3 | Item3.3 | Item4.3 |
-| Switch to previous buffer | Item2.4 | Item3.4 | Item4.4 |
-| Search in current buffer | Item2.4 | Item3.4 | Item4.4 |
-| Replace in current buffer | Item2.4 | Item3.4 | Item4.4 |
-| Save changes | Item2.4 | Item3.4 | Item4.4 |
-| Undo last change | Item2.4 | Item3.4 | Item4.4 |
-| Redo last change | Item2.4 | Item3.4 | Item4.4 |
-| Quit | Item2.4 | Item3.4 | Item4.4 |
+| Action                    | Description                                                       | Default                  | Config definition                |
+|---------------------------|-------------------------------------------------------------------|--------------------------|----------------------------------|
+| Open file                 | Opens a popup where a relative path should be inserted           | ctrl+o                   | "open_file"                     |
+| Open new buffer           | Creates a new, empty buffer not bound to a file for editing      | ctrl+n                   | "new_buffer"                    |
+| Switch to next buffer     | Moves focus to the next buffer in the list                       | ctrl+h                   | "next_buffer"                   |
+| Switch to previous buffer | Moves focus to the previous buffer in the list                   | ctrl+l                   | "previous_buffer"               |
+| Search in current buffer  | Searches for a specific term within the currently active buffer  | ctrl+f                   | "search_in_current_buffer"      |
+| Replace in current buffer | Replaces text within the current buffer based on a search query  | ctrl+j                   | "replace_in_current_buffer"     |
+| Save changes              | Saves the current buffer to its associated file                 | ctrl+s                   | "save"                          |
+| Undo last change          | Reverts the most recent change in the current buffer            | ctrl+z                   | "undo"                          |
+| Redo last change          | Reapplies the most recently undone change in the current buffer | ctrl+y                   | "redo"                          |
+| Quit                      | Closes the application                                           | ctrl+q                   | "quit"                          |
 
-* "open_file" opens a text input to enter the relative path of the file
-to be opened. Default:
-* "new_buffer" creates an empty buffer
-
-Note that if you want to create a keybinding which contains multiple modifiers (ctrl+alt, alt+shift, etc),
-you need to have a <!-- TODO: https://docs.rs/crossterm/latest/crossterm/event/struct.KeyboardEnhancementFlags.html -->
+Keybindings which contain multiple modifiers are not yet supported and will be added
+in the future (<https://docs.rs/crossterm/latest/crossterm/event/struct.KeyboardEnhancementFlags.html>).
