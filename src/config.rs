@@ -126,11 +126,11 @@ impl Default for Config {
                 Operation::CreateNewBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Tab, KeyModifiers::CONTROL),
+                KeyShortcut::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
                 Operation::SwitchToNextBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Tab, KeyModifiers::SHIFT | KeyModifiers::CONTROL),
+                KeyShortcut::new(KeyCode::Char('l'), KeyModifiers::CONTROL),
                 Operation::SwitchToPreviousBuffer,
             ),
             (
@@ -142,7 +142,7 @@ impl Default for Config {
                 Operation::SearchInCurrentBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+                KeyShortcut::new(KeyCode::Char('j'), KeyModifiers::CONTROL),
                 Operation::SearchAndReplaceInCurrentBuffer,
             ),
             (
@@ -150,10 +150,7 @@ impl Default for Config {
                 Operation::Undo,
             ),
             (
-                KeyShortcut::new(
-                    KeyCode::Char('z'),
-                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
-                ),
+                KeyShortcut::new(KeyCode::Char('y'), KeyModifiers::CONTROL),
                 Operation::Redo,
             ),
             (
@@ -209,15 +206,19 @@ mod config_test {
                 Operation::OpenFile,
             ),
             (
+                KeyShortcut::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+                Operation::SaveBufferToFile,
+            ),
+            (
                 KeyShortcut::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
                 Operation::CreateNewBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Tab, KeyModifiers::CONTROL),
+                KeyShortcut::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
                 Operation::SwitchToNextBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Tab, KeyModifiers::SHIFT | KeyModifiers::CONTROL),
+                KeyShortcut::new(KeyCode::Char('l'), KeyModifiers::CONTROL),
                 Operation::SwitchToPreviousBuffer,
             ),
             (
@@ -229,22 +230,15 @@ mod config_test {
                 Operation::SearchInCurrentBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+                KeyShortcut::new(KeyCode::Char('j'), KeyModifiers::CONTROL),
                 Operation::SearchAndReplaceInCurrentBuffer,
-            ),
-            (
-                KeyShortcut::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
-                Operation::SaveBufferToFile,
             ),
             (
                 KeyShortcut::new(KeyCode::Char('z'), KeyModifiers::CONTROL),
                 Operation::Undo,
             ),
             (
-                KeyShortcut::new(
-                    KeyCode::Char('z'),
-                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
-                ),
+                KeyShortcut::new(KeyCode::Char('y'), KeyModifiers::CONTROL),
                 Operation::Redo,
             ),
             (
