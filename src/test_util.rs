@@ -16,7 +16,7 @@ pub mod fs {
 
 #[cfg(test)]
 pub mod ui {
-    use ratatui::buffer;
+    use ratatui::buffer::Buffer;
 
     /// Return a string representation of a solid border of a given length.
     pub fn solid_border(length: usize) -> String {
@@ -36,7 +36,7 @@ pub mod ui {
 
     /// Return a string representation of a terminal buffer line with
     /// the given index
-    pub fn nth_line_from_terminal_buffer(buf: &buffer::Buffer, n: u16) -> String {
+    pub fn nth_line_from_terminal_buffer(buf: &Buffer, n: u16) -> String {
         let width = buf.area.width;
         let line = (0..width).fold(String::from(""), |acc, x| {
             acc + buf

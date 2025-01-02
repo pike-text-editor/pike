@@ -5,22 +5,29 @@ use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     path::{Path, PathBuf},
 };
 
 /// Returns the default configuration path for pike regardless
 /// of OS
-pub fn default_config_path() -> Result<PathBuf, String> {
+pub fn default_config_file_path() -> Result<PathBuf, String> {
+    let mut path = default_config_dir_path()?;
+    path.push("pike.toml");
+    Ok(path)
+}
+
+/// Return the configuration directory path for pike.
+pub fn default_config_dir_path() -> Result<PathBuf, String> {
     let config_dir = dirs::config_dir();
     match config_dir {
         Some(mut path) => {
-            path.push("pike.toml");
+            path.push("pike");
             Ok(path)
         }
         None => Err("Failed to get the configuration directory".to_string()),
     }
 }
-
 /// Editor configuration
 #[derive(Debug, PartialEq, Eq)]
 pub struct Config {
@@ -66,8 +73,8 @@ impl Config {
     pub fn from_file(path: Option<&Path>) -> Result<Config, String> {
         match path {
             Some(path) => {
-                let contents = std::fs::read_to_string(path)
-                    .map_err(|e| format!("Error reading file: {e}"))?;
+                let contents =
+                    fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
                 Config::from_toml_representation(&contents)
             }
             None => Ok(Config::default()),
@@ -336,8 +343,9 @@ mod config_test {
 
     #[test]
     fn test_default_config_path() {
-        let expected = dirs::config_dir().unwrap().join("pike.toml");
-        let actual = super::default_config_path().expect("Failed to get default config path");
+        let expected = dirs::config_dir().unwrap().join("pike").join("pike.toml");
+        let actual =
+            crate::config::default_config_file_path().expect("Failed to get default config path");
         assert_eq!(expected, actual);
     }
 }

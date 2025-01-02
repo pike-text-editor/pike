@@ -1,9 +1,12 @@
 use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
     text::{Text, ToText},
     widgets::{self, Paragraph, StatefulWidget, Widget},
 };
 use scribe::buffer::Position as BufferPosition;
 use std::cmp::min;
+use tui_input::Input;
 
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
@@ -45,7 +48,7 @@ pub struct UIState {
     pub buffer_offset: BufferDisplayOffset,
 
     /// Currently open file input
-    pub file_input: Option<tui_input::Input>,
+    pub file_input: Option<Input>,
 }
 
 /// Widget for displaying the buffer contents. Serves as a thin wrapper
@@ -79,7 +82,7 @@ impl BufferDisplay<'_> {
     }
 
     /// Updates the x offset of the buffer so that the cursor is always visible
-    fn update_x_offset(&mut self, area: ratatui::prelude::Rect) {
+    fn update_x_offset(&mut self, area: Rect) {
         let cursor_x = self
             .cursor_position
             .unwrap_or(&BufferPosition { line: 0, offset: 0 })
@@ -98,7 +101,7 @@ impl BufferDisplay<'_> {
     }
 
     /// Updates the y offset of the buffer so that the cursor is always visible
-    fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
+    fn update_y_offset(&mut self, area: Rect) {
         let cursor_y = self
             .cursor_position
             .unwrap_or(&BufferPosition { line: 0, offset: 0 })
@@ -142,7 +145,7 @@ impl BufferDisplay<'_> {
 }
 
 impl Widget for BufferDisplay<'_> {
-    fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+    fn render(mut self, area: Rect, buf: &mut Buffer) {
         self.update_x_offset(area);
         self.update_y_offset(area);
         let contents_shifted_right = self.shift_contents_right(self.buffer_contents.to_string());
@@ -164,12 +167,7 @@ pub struct FileInput {}
 impl StatefulWidget for FileInput {
     type State = tui_input::Input;
 
-    fn render(
-        self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        state: &mut Self::State,
-    ) {
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let widget = widgets::Paragraph::new(state.to_text()).block(
             widgets::Block::new()
                 .borders(widgets::Borders::all())
@@ -181,7 +179,8 @@ impl StatefulWidget for FileInput {
 
 #[cfg(test)]
 mod tests {
-    use ratatui::{buffer, layout, widgets::StatefulWidget};
+    use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
+    use tui_input::{Input, InputRequest};
 
     use crate::test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border};
 
@@ -190,8 +189,8 @@ mod tests {
 
     #[test]
     fn file_input_displays_input() {
-        let mut input: tui_input::Input = "hello".into();
-        let mut buf = buffer::Buffer::empty(layout::Rect::new(0, 0, 10, 3));
+        let mut input: Input = "hello".into();
+        let mut buf = Buffer::empty(Rect::new(0, 0, 10, 3));
 
         let widget = FileInput::default();
         widget.render(buf.area, &mut buf, &mut input);
@@ -205,7 +204,7 @@ mod tests {
         );
 
         // Insert an additional character
-        let request = tui_input::InputRequest::InsertChar(',');
+        let request = InputRequest::InsertChar(',');
         input.handle(request);
 
         let widget = FileInput::default();
