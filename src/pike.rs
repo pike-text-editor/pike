@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::config::Config;
+use crate::key_shortcut::KeyShortcut;
+use crate::operations::Operation;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 
@@ -236,6 +238,11 @@ impl Pike {
     /// Returns the current working directory as a pathbuf
     fn cwd(&self) -> PathBuf {
         self.workspace.path.clone()
+    }
+
+    /// Gets an operation corresponding to a key shortcut
+    pub fn get_keymap(&self, mapping: &KeyShortcut) -> Option<&Operation> {
+        self.config.key_mappings.get(mapping)
     }
 }
 

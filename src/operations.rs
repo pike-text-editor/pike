@@ -2,7 +2,6 @@
 /// Every keymappable operation within pike
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Operation {
-    CreateNewFile,
     OpenFile,
 
     CreateNewBuffer,
@@ -20,6 +19,8 @@ pub enum Operation {
 
     FindFilesInCWD,
     FindTextInCWD,
+
+    Quit,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -27,7 +28,6 @@ impl Operation {
     /// Creates a new Operation from a string from a config file
     pub fn from_string(query: &str) -> Result<Operation, String> {
         let return_value = match query {
-            "new_file" => Operation::CreateNewFile,
             "open_file" => Operation::OpenFile,
             "new_buffer" => Operation::CreateNewBuffer,
             "previous_buffer" => Operation::SwitchToPreviousBuffer,
@@ -40,6 +40,7 @@ impl Operation {
             "redo" => Operation::Redo,
             "find_files_in_cwd" => Operation::FindFilesInCWD,
             "find_text_in_cwd" => Operation::FindTextInCWD,
+            "quit" => Operation::Quit,
             _ => return Err(format!("Invalid operation in config: {query}")),
         };
         Ok(return_value)
