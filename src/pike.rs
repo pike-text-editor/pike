@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::config;
@@ -64,6 +65,27 @@ impl Pike {
         Ok(())
     }
 
+    /// Create a file if if does not exists and open it
+    pub fn create_and_open_file(&mut self, path: &Path) -> Result<(), String> {
+        if !path.exists() {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create directory: {}", e))?;
+            }
+
+            fs::File::create(path).map_err(|e| {
+                format!(
+                    "Failed to create file: {} ({})",
+                    path.to_str()
+                        .expect("A path to file has to be valid unicode"),
+                    e
+                )
+            })?;
+        }
+        self.open_file(path, 0, 0)?;
+        Ok(())
+    }
+
     /// Writes `text` to current buffer
     fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
@@ -84,8 +106,11 @@ impl Pike {
         }
     }
 
-    pub fn current_buffer_path(&self) -> Option<&Path> {
-        self.workspace.current_buffer_path()
+    /// Returns an absolute path to the current buffer or None
+    pub fn current_buffer_path(&self) -> Option<PathBuf> {
+        self.workspace
+            .current_buffer_path()
+            .map(|buf| self.workspace.path.join(buf))
     }
 
     /// Returns the filename of the current buffer or an empty string
@@ -216,7 +241,10 @@ impl Pike {
 
 #[cfg(test)]
 mod pike_test {
-    use std::{env, path::PathBuf};
+    use std::{
+        env,
+        path::{self, PathBuf},
+    };
 
     use crate::{config::Config, test_util::temp_file_with_contents};
     use scribe::buffer::Position;
@@ -244,6 +272,14 @@ mod pike_test {
             Pike::build(cwd.clone(), cwf_path, config_path).expect("Failed to build Pike"),
             cwd,
         )
+    }
+
+    /// Canonicalizes two paths and asserts their equality
+    fn assert_paths(path1: &path::Path, path2: &path::Path) {
+        assert_eq!(
+            path1.canonicalize().expect("Failed to canonicalize path"),
+            path2.canonicalize().expect("Failed to canonicalize path")
+        );
     }
 
     #[test]
@@ -539,5 +575,53 @@ mod pike_test {
         let pike = tmp_pike_and_working_dir(None, None).0;
 
         assert_eq!(pike.current_line_length(), 0);
+    }
+
+    #[test]
+    fn test_create_and_open_file_doesnt_exist() {
+        let (mut pike, cwd) = tmp_pike_and_working_dir(None, None);
+        let file_path = cwd.join("test.txt");
+
+        pike.create_and_open_file(&file_path)
+            .expect("Failed to create and open file");
+
+        assert_paths(
+            &pike
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file"),
+            &file_path,
+        );
+    }
+
+    #[test]
+    fn test_create_and_open_file_nested() {
+        let (mut pike, cwd) = tmp_pike_and_working_dir(None, None);
+        let file_path = cwd.join("nested").join("test.txt");
+
+        pike.create_and_open_file(&file_path)
+            .expect("Failed to create and open file");
+
+        assert_paths(
+            &pike
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file"),
+            &file_path,
+        );
+    }
+
+    #[test]
+    fn test_create_and_open_file_exists() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.create_and_open_file(file.path())
+            .expect("Failed to create and open file");
+
+        assert_paths(
+            &pike
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file"),
+            file.path(),
+        );
     }
 }
