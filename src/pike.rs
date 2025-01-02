@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
 use crate::config;
@@ -73,7 +73,7 @@ impl Pike {
                     .map_err(|e| format!("Failed to create directory: {}", e))?;
             }
 
-            fs::File::create(path).map_err(|e| {
+            File::create(path).map_err(|e| {
                 format!(
                     "Failed to create file: {} ({})",
                     path.to_str()
@@ -242,8 +242,8 @@ impl Pike {
 #[cfg(test)]
 mod pike_test {
     use std::{
-        env,
-        path::{self, PathBuf},
+        env, fs,
+        path::{Path, PathBuf},
     };
 
     use crate::{config::Config, test_util::temp_file_with_contents};
@@ -275,7 +275,7 @@ mod pike_test {
     }
 
     /// Canonicalizes two paths and asserts their equality
-    fn assert_paths(path1: &path::Path, path2: &path::Path) {
+    fn assert_paths(path1: &Path, path2: &Path) {
         assert_eq!(
             path1.canonicalize().expect("Failed to canonicalize path"),
             path2.canonicalize().expect("Failed to canonicalize path")
@@ -424,7 +424,7 @@ mod pike_test {
             .expect("Failed to open file");
         pike.save_current_buffer().expect("Failed to save buffer");
 
-        let contents = std::fs::read_to_string(file.path()).expect("Failed to read file");
+        let contents = fs::read_to_string(file.path()).expect("Failed to read file");
         assert_eq!(contents, "Hello, world!");
     }
 

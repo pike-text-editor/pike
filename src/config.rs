@@ -5,6 +5,7 @@ use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -55,8 +56,8 @@ impl Config {
     pub fn from_file(path: Option<&Path>) -> Result<Config, String> {
         match path {
             Some(path) => {
-                let contents = std::fs::read_to_string(path)
-                    .map_err(|e| format!("Error reading file: {e}"))?;
+                let contents =
+                    fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
                 Config::from_toml_representation(&contents)
             }
             None => Ok(Config::default()),
