@@ -165,7 +165,7 @@ mod config_test {
 
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::{config::default_config_path, operations::Operation};
+    use crate::operations::Operation;
 
     use super::{Config, KeyShortcut};
 
