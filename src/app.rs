@@ -381,13 +381,9 @@ impl App {
                     self.exit();
                     return true;
                 }
-                Operation::CreateNewBuffer => {
-                    self.backend.open_new_buffer();
-                }
-                Operation::SwitchToPreviousBuffer => {
-                    todo!("Handle SwitchToPreviousBuffer operation")
-                }
-                Operation::SwitchToNextBuffer => todo!("Handle SwitchToNextBuffer operation"),
+                Operation::CreateNewBuffer => self.backend.open_new_buffer(),
+                Operation::SwitchToPreviousBuffer => self.backend.previous_buffer(),
+                Operation::SwitchToNextBuffer => self.backend.next_buffer(),
 
                 Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
                 Operation::SearchAndReplaceInCurrentBuffer => {
