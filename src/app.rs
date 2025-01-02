@@ -319,19 +319,11 @@ impl App {
             return Ok(());
         }
 
-        if self.handle_keybind(key) {
+        if self.try_handle_keybind(key) {
             return Ok(());
         }
 
         match key.code {
-            KeyCode::Char('q') => {
-                self.exit();
-                Ok(())
-            }
-            KeyCode::Char('n') => {
-                self.open_file_input("");
-                Ok(())
-            }
             KeyCode::Left => {
                 self.backend.move_cursor_left();
                 Ok(())
@@ -371,40 +363,44 @@ impl App {
     }
 
     /// Tries to match the given key event to a registered keybind and handle it.
-    fn handle_keybind(&mut self, key: KeyEvent) -> bool {
-        if let Some(op) = self.backend.get_keymap(&key.into()) {
-            match op {
-                Operation::OpenFile => {
-                    self.open_file_input("");
-                }
-                Operation::Quit => {
-                    self.exit();
-                    return true;
-                }
-                Operation::CreateNewBuffer => todo!("Handle CreateNewBuffer operation"),
-                Operation::SwitchToPreviousBuffer => {
-                    todo!("Handle SwitchToPreviousBuffer operation")
-                }
-                Operation::SwitchToNextBuffer => todo!("Handle SwitchToNextBuffer operation"),
-
-                Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
-                Operation::SearchAndReplaceInCurrentBuffer => {
-                    todo!("Handle SearchAndReplaceInCurrentBuffer operation")
-                }
-
-                Operation::SaveBufferToFile => todo!("Handle SaveBufferToFile operation"),
-
-                Operation::Undo => todo!("Handle Undo operation"),
-                Operation::Redo => todo!("Handle Redo operation"),
-
-                // WARN: these probably won't be supported
-                Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
-                Operation::FindTextInCWD => todo!("Handle FindTextInCWD operation"),
-                Operation::OpenBufferPicker => todo!("Handle OpenBufferPicker operation"),
+    fn try_handle_keybind(&mut self, key: KeyEvent) -> bool {
+        match self.backend.get_keymap(&key.into()).cloned() {
+            Some(op) => {
+                self.handle_operation(&op);
+                true
             }
-            true
-        } else {
-            false
+            None => false,
+        }
+    }
+
+    fn handle_operation(&mut self, op: &Operation) {
+        match op {
+            Operation::OpenFile => {
+                self.open_file_input("");
+            }
+            Operation::Quit => {
+                self.exit();
+            }
+            Operation::CreateNewBuffer => todo!("Handle CreateNewBuffer operation"),
+            Operation::SwitchToPreviousBuffer => {
+                todo!("Handle SwitchToPreviousBuffer operation")
+            }
+            Operation::SwitchToNextBuffer => todo!("Handle SwitchToNextBuffer operation"),
+
+            Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
+            Operation::SearchAndReplaceInCurrentBuffer => {
+                todo!("Handle SearchAndReplaceInCurrentBuffer operation")
+            }
+
+            Operation::SaveBufferToFile => todo!("Handle SaveBufferToFile operation"),
+
+            Operation::Undo => todo!("Handle Undo operation"),
+            Operation::Redo => todo!("Handle Redo operation"),
+
+            // WARN: these probably won't be supported
+            Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
+            Operation::FindTextInCWD => todo!("Handle FindTextInCWD operation"),
+            Operation::OpenBufferPicker => todo!("Handle OpenBufferPicker operation"),
         }
     }
 }
