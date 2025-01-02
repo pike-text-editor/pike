@@ -17,7 +17,6 @@ pub fn default_config_file_path() -> Result<PathBuf, String> {
 }
 
 /// Return the configuration directory path for pike.
-#[allow(dead_code)]
 pub fn default_config_dir_path() -> Result<PathBuf, String> {
     let config_dir = dirs::config_dir();
     match config_dir {
@@ -323,7 +322,8 @@ mod config_test {
     #[test]
     fn test_default_config_path() {
         let expected = dirs::config_dir().unwrap().join("pike").join("pike.toml");
-        let actual = super::default_config_file_path().expect("Failed to get default config path");
+        let actual =
+            crate::config::default_config_file_path().expect("Failed to get default config path");
         assert_eq!(expected, actual);
     }
 }
