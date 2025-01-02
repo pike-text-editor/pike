@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{self, Position as TerminalPosition},
+    layout::Position as TerminalPosition,
     text::Text,
     widgets::{Paragraph, StatefulWidget, Widget},
 };

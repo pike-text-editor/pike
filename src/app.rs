@@ -3,7 +3,7 @@ use std::{io, path::PathBuf};
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseEvent};
 use ratatui::{
-    layout::{self, Constraint, Direction, Layout, Position as TerminalPosition},
+    layout::{self, Constraint, Direction, Layout},
     prelude::{Backend, StatefulWidget},
     text::Text,
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
