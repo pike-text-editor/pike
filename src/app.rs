@@ -258,7 +258,7 @@ impl App {
 
     /// Try to handle the key press using a file input. Returns a boolean
     /// indicating whether the event has been handled or not.
-    fn handle_key_press_with_file_input(&mut self, key: KeyEvent) -> bool {
+    fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> bool {
         // No input means the event can't be handled
         let input = match self.ui_state.file_input.as_mut() {
             Some(input) => input,
@@ -314,7 +314,7 @@ impl App {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
         // Try to handle the event using a file input
-        if self.handle_key_press_with_file_input(key) {
+        if self.try_handle_key_press_with_file_input(key) {
             return Ok(());
         }
 
