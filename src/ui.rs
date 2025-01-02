@@ -38,6 +38,7 @@ impl BufferDisplayOffset {
 }
 
 #[derive(Default)]
+/// Represents the state of a buffer display, including its contents, cursor position, and offset.
 pub struct BufferDisplayState {
     pub buffer_contents: String,
     pub cursor_position: Option<BufferPosition>,
@@ -156,7 +157,6 @@ pub struct UIState {
 /// to lift the responsibility of actually rendering the contents from the
 /// app itself, so it does not copy the data, but itself receives references
 /// as it's created on every app render.
-
 pub struct BufferDisplayWidget;
 
 impl StatefulWidget for BufferDisplayWidget {
