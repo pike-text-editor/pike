@@ -1,7 +1,10 @@
+use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::config::Config;
+use crate::key_shortcut::KeyShortcut;
+use crate::operations::Operation;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 
@@ -22,8 +25,8 @@ impl Pike {
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
         if config_file.is_none() {
-            let default_config_path = config::default_config_path();
-            if let Ok(default_config_path) = default_config_path {
+            let default_config_file_path = config::default_config_file_path();
+            if let Ok(default_config_path) = default_config_file_path {
                 if default_config_path.exists() {
                     config_file = Some(default_config_path.to_path_buf());
                 }
@@ -64,6 +67,27 @@ impl Pike {
         Ok(())
     }
 
+    /// Create a file if if does not exists and open it
+    pub fn create_and_open_file(&mut self, path: &Path) -> Result<(), String> {
+        if !path.exists() {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create directory: {}", e))?;
+            }
+
+            File::create(path).map_err(|e| {
+                format!(
+                    "Failed to create file: {} ({})",
+                    path.to_str()
+                        .expect("A path to file has to be valid unicode"),
+                    e
+                )
+            })?;
+        }
+        self.open_file(path, 0, 0)?;
+        Ok(())
+    }
+
     /// Writes `text` to current buffer
     fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
@@ -84,8 +108,11 @@ impl Pike {
         }
     }
 
-    pub fn current_buffer_path(&self) -> Option<&Path> {
-        self.workspace.current_buffer_path()
+    /// Returns an absolute path to the current buffer or None
+    pub fn current_buffer_path(&self) -> Option<PathBuf> {
+        self.workspace
+            .current_buffer_path()
+            .map(|buf| self.workspace.path.join(buf))
     }
 
     /// Returns the filename of the current buffer or an empty string
@@ -161,9 +188,10 @@ impl Pike {
         }
     }
 
-    /// Create a new empty buffer and set it as the current buffer
-    fn new_buffer(&mut self) {
-        todo!()
+    /// Create a new empty buffer not bound to a path and set it as the current buffer
+    pub fn open_new_buffer(&mut self) {
+        let buf = Buffer::new();
+        self.workspace.add_buffer(buf);
     }
 
     /// Switch to the previous buffer
@@ -212,11 +240,19 @@ impl Pike {
     fn cwd(&self) -> PathBuf {
         self.workspace.path.clone()
     }
+
+    /// Gets an operation corresponding to a key shortcut
+    pub fn get_keymap(&self, mapping: &KeyShortcut) -> Option<&Operation> {
+        self.config.key_mappings.get(mapping)
+    }
 }
 
 #[cfg(test)]
 mod pike_test {
-    use std::{env, path::PathBuf};
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+    };
 
     use crate::{config::Config, test_util::temp_file_with_contents};
     use scribe::buffer::Position;
@@ -244,6 +280,14 @@ mod pike_test {
             Pike::build(cwd.clone(), cwf_path, config_path).expect("Failed to build Pike"),
             cwd,
         )
+    }
+
+    /// Canonicalizes two paths and asserts their equality
+    fn assert_paths(path1: &Path, path2: &Path) {
+        assert_eq!(
+            path1.canonicalize().expect("Failed to canonicalize path"),
+            path2.canonicalize().expect("Failed to canonicalize path")
+        );
     }
 
     #[test]
@@ -388,7 +432,7 @@ mod pike_test {
             .expect("Failed to open file");
         pike.save_current_buffer().expect("Failed to save buffer");
 
-        let contents = std::fs::read_to_string(file.path()).expect("Failed to read file");
+        let contents = fs::read_to_string(file.path()).expect("Failed to read file");
         assert_eq!(contents, "Hello, world!");
     }
 
@@ -539,5 +583,75 @@ mod pike_test {
         let pike = tmp_pike_and_working_dir(None, None).0;
 
         assert_eq!(pike.current_line_length(), 0);
+    }
+
+    #[test]
+    fn test_create_and_open_file_doesnt_exist() {
+        let (mut pike, cwd) = tmp_pike_and_working_dir(None, None);
+        let file_path = cwd.join("test.txt");
+
+        pike.create_and_open_file(&file_path)
+            .expect("Failed to create and open file");
+
+        assert_paths(
+            &pike
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file"),
+            &file_path,
+        );
+    }
+
+    #[test]
+    fn test_create_and_open_file_nested() {
+        let (mut pike, cwd) = tmp_pike_and_working_dir(None, None);
+        let file_path = cwd.join("nested").join("test.txt");
+
+        pike.create_and_open_file(&file_path)
+            .expect("Failed to create and open file");
+
+        assert_paths(
+            &pike
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file"),
+            &file_path,
+        );
+    }
+
+    #[test]
+    fn test_create_and_open_file_exists() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.create_and_open_file(file.path())
+            .expect("Failed to create and open file");
+
+        assert_paths(
+            &pike
+                .current_buffer_path()
+                .expect("Buffer should be set after opening a file"),
+            file.path(),
+        );
+    }
+
+    #[test]
+    fn test_open_new_buffer() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        // Should be empty with no path
+        pike.open_new_buffer();
+        assert_eq!(pike.current_buffer_contents(), "");
+        assert!(pike
+            .current_buffer()
+            .expect("A buffer should be open")
+            .path
+            .is_none());
+
+        // Another one, should be three buffers alltogether
+        pike.open_new_buffer();
+        assert_eq!(pike.workspace.buffer_paths().len(), 3)
     }
 }

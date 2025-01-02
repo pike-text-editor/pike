@@ -1,10 +1,12 @@
 use ratatui::{
-    layout::Position as TerminalPosition,
-    text::Text,
-    widgets::{Paragraph, StatefulWidget, Widget},
+    buffer::Buffer,
+    layout::{Position as TerminalPosition, Rect},
+    text::{Text, ToText},
+    widgets::{self, Paragraph, StatefulWidget, Widget},
 };
 use scribe::buffer::Position as BufferPosition;
 use std::cmp::min;
+use tui_input::Input;
 
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
@@ -25,9 +27,9 @@ struct Picker {}
 #[derive(Default)]
 pub struct BufferDisplayOffset {
     /// X offset of the line pointed at by the cursor
-    x: usize,
+    pub x: usize,
     /// Y offset of the entire buffer
-    y: usize,
+    pub y: usize,
 }
 
 #[allow(dead_code)]
@@ -184,5 +186,66 @@ impl StatefulWidget for BufferDisplayWidget {
 
         // We need the Widget trait to be in scope for .render(...) to work
         paragraph_widget.render(area, buf);
+    }
+}
+
+/// A widget for displaying a text input passed to it as a state
+/// In the future might need factoring out to accomodate other UI
+/// elements that need such functionality and just have a title
+/// and callback passed to it as arguments
+#[derive(Default)]
+pub struct FileInput {}
+
+impl StatefulWidget for FileInput {
+    type State = tui_input::Input;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let widget = widgets::Paragraph::new(state.to_text()).block(
+            widgets::Block::new()
+                .borders(widgets::Borders::all())
+                .title("Enter relative file path"),
+        );
+        widget.render(area, buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
+    use tui_input::{Input, InputRequest};
+
+    use crate::test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border};
+
+    use super::FileInput;
+    // TODO: could move some BufferDisplay tests here for clarity
+
+    #[test]
+    fn file_input_displays_input() {
+        let mut input: Input = "hello".into();
+        let mut buf = Buffer::empty(Rect::new(0, 0, 10, 3));
+
+        let widget = FileInput::default();
+        widget.render(buf.area, &mut buf, &mut input);
+
+        // Skip the borders, we're not testing the library
+        let text_line = nth_line_from_terminal_buffer(&buf, 1);
+
+        assert_eq!(
+            text_line,
+            vertical_border() + "hello" + &n_spaces(3) + &vertical_border()
+        );
+
+        // Insert an additional character
+        let request = InputRequest::InsertChar(',');
+        input.handle(request);
+
+        let widget = FileInput::default();
+        widget.render(buf.area, &mut buf, &mut input);
+        let text_line = nth_line_from_terminal_buffer(&buf, 1);
+
+        assert_eq!(
+            text_line,
+            vertical_border() + "hello," + &n_spaces(2) + &vertical_border()
+        );
     }
 }

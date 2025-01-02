@@ -5,26 +5,33 @@ use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     path::{Path, PathBuf},
 };
 
 /// Returns the default configuration path for pike regardless
 /// of OS
-pub fn default_config_path() -> Result<PathBuf, String> {
+pub fn default_config_file_path() -> Result<PathBuf, String> {
+    let mut path = default_config_dir_path()?;
+    path.push("pike.toml");
+    Ok(path)
+}
+
+/// Return the configuration directory path for pike.
+pub fn default_config_dir_path() -> Result<PathBuf, String> {
     let config_dir = dirs::config_dir();
     match config_dir {
         Some(mut path) => {
-            path.push("pike.toml");
+            path.push("pike");
             Ok(path)
         }
         None => Err("Failed to get the configuration directory".to_string()),
     }
 }
-
 /// Editor configuration
 #[derive(Debug, PartialEq, Eq)]
 pub struct Config {
-    key_mappings: HashMap<KeyShortcut, Operation>,
+    pub key_mappings: HashMap<KeyShortcut, Operation>,
 }
 
 #[allow(dead_code)]
@@ -39,7 +46,24 @@ impl Config {
 
         if let Some(keymap_table) = parsed.get("keymaps").and_then(|keys| keys.as_table()) {
             let keymap_pairs = Config::keymap_pairs_from_toml_table(keymap_table)?;
-            return_value.key_mappings.extend(keymap_pairs);
+
+            // Reverse the key_mappings (switch KeyShortcut and Operation)
+            let mut reversed_keymaps: HashMap<Operation, KeyShortcut> = return_value
+                .key_mappings
+                .iter()
+                .map(|(sh, op)| (op.clone(), sh.clone()))
+                .collect();
+
+            // Extend the reversed keymap with new keymap pairs
+            for (op, sh) in keymap_pairs {
+                reversed_keymaps.insert(op, sh);
+            }
+
+            // Rebuild the key_mappings with reversed keys and operations
+            return_value.key_mappings = reversed_keymaps
+                .into_iter()
+                .map(|(op, sh)| (sh, op))
+                .collect();
         }
 
         Ok(return_value)
@@ -49,8 +73,8 @@ impl Config {
     pub fn from_file(path: Option<&Path>) -> Result<Config, String> {
         match path {
             Some(path) => {
-                let contents = std::fs::read_to_string(path)
-                    .map_err(|e| format!("Error reading file: {e}"))?;
+                let contents =
+                    fs::read_to_string(path).map_err(|e| format!("Error reading file: {e}"))?;
                 Config::from_toml_representation(&contents)
             }
             None => Ok(Config::default()),
@@ -62,8 +86,8 @@ impl Config {
     /// over the default configuration
     fn keymap_pairs_from_toml_table(
         table: &Table,
-    ) -> Result<Vec<(KeyShortcut, Operation)>, String> {
-        let mut return_value = Vec::<(KeyShortcut, Operation)>::new();
+    ) -> Result<Vec<(Operation, KeyShortcut)>, String> {
+        let mut return_value = Vec::<(Operation, KeyShortcut)>::new();
         let mut seen_shortcuts = HashSet::<KeyShortcut>::new();
         let mut seen_operations = HashSet::<Operation>::new();
 
@@ -80,7 +104,7 @@ impl Config {
                 return Err(format!("Duplicate keymap operation found: {:?}", op));
             }
 
-            return_value.push((shortcut, op));
+            return_value.push((op, shortcut));
         }
         Ok(return_value)
     }
@@ -146,6 +170,10 @@ impl Default for Config {
                 ),
                 Operation::FindTextInCWD,
             ),
+            (
+                KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+                Operation::Quit,
+            ),
         ]);
 
         Config { key_mappings }
@@ -166,7 +194,7 @@ mod config_test {
     fn from_toml_keymap_section_valid_case() {
         let keymap_section = r#"
             [keymaps]
-            "ctrl+shift+x" = "new_file"
+            "ctrl+shift+x" = "open_file"
             "#;
 
         let actual = Config::from_toml_representation(keymap_section)
@@ -178,10 +206,6 @@ mod config_test {
                     KeyCode::Char('x'),
                     KeyModifiers::SHIFT | KeyModifiers::CONTROL,
                 ),
-                Operation::CreateNewFile,
-            ),
-            (
-                KeyShortcut::new(KeyCode::Char('o'), KeyModifiers::CONTROL),
                 Operation::OpenFile,
             ),
             (
@@ -236,6 +260,10 @@ mod config_test {
                     KeyModifiers::SHIFT | KeyModifiers::CONTROL,
                 ),
                 Operation::FindTextInCWD,
+            ),
+            (
+                KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+                Operation::Quit,
             ),
         ]);
         assert_eq!(expected, actual);
@@ -315,8 +343,9 @@ mod config_test {
 
     #[test]
     fn test_default_config_path() {
-        let expected = dirs::config_dir().unwrap().join("pike.toml");
-        let actual = super::default_config_path().expect("Failed to get default config path");
+        let expected = dirs::config_dir().unwrap().join("pike").join("pike.toml");
+        let actual =
+            crate::config::default_config_file_path().expect("Failed to get default config path");
         assert_eq!(expected, actual);
     }
 }
