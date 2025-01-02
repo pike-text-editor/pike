@@ -188,9 +188,10 @@ impl Pike {
         }
     }
 
-    /// Create a new empty buffer and set it as the current buffer
-    fn new_buffer(&mut self) {
-        todo!()
+    /// Create a new empty buffer not bound to a path and set it as the current buffer
+    pub fn open_new_buffer(&mut self) {
+        let buf = Buffer::new();
+        self.workspace.add_buffer(buf);
     }
 
     /// Switch to the previous buffer
@@ -630,5 +631,27 @@ mod pike_test {
                 .expect("Buffer should be set after opening a file"),
             file.path(),
         );
+    }
+
+    #[test]
+    fn test_open_new_buffer() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        // Should be empty with no path
+        pike.open_new_buffer();
+        assert_eq!(pike.current_buffer_contents(), "");
+        assert!(pike
+            .current_buffer()
+            .expect("A buffer should be open")
+            .path
+            .is_none());
+
+        // Another one, should be three buffers alltogether
+        pike.open_new_buffer();
+        assert_eq!(pike.workspace.buffer_paths().len(), 3)
     }
 }
