@@ -313,7 +313,6 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
-        // Try to handle the event using a file input
         if self.try_handle_key_press_with_file_input(key) {
             return Ok(());
         }
