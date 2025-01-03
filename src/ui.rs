@@ -18,6 +18,16 @@ use tui_input::Input;
 #[allow(dead_code)]
 struct Picker {}
 
+/// Holds the information about the current state of the UI
+/// of the app.
+#[allow(dead_code)]
+#[derive(Default)]
+pub struct UIState {
+    /// Offset of the currently rendered buffer
+    pub buffer_state: BufferDisplayState,
+    pub file_input: Option<Input>,
+}
+
 /// Holds the information how much offset is the
 /// current buffer when displayed - for example, it's
 /// displayed from line 6 until either the end of the buffer ->
@@ -47,6 +57,7 @@ pub struct BufferDisplayState {
     pub offset: BufferDisplayOffset,
 }
 
+#[allow(dead_code)]
 impl BufferDisplayState {
     pub fn new(
         buffer_contents: String,
@@ -144,15 +155,6 @@ impl BufferDisplayState {
             ),
         }
     }
-}
-
-/// Holds the information about the current state of the UI
-/// of the app.
-#[allow(dead_code)]
-#[derive(Default)]
-pub struct UIState {
-    /// Offset of the currently rendered buffer
-    pub buffer_state: BufferDisplayState,
 }
 
 /// Widget for displaying the buffer contents. Serves as a thin wrapper

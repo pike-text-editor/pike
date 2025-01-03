@@ -6,10 +6,11 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Position as TerminalPosition, Rect},
     prelude::{Backend, StatefulWidget},
     text::Text,
-    widgets::{Block, Borders, Paragraph, StatefulWidget, Widget, Wrap},
+    widgets::{Block, Borders, Paragraph, Widget, Wrap},
     Terminal,
 };
 use std::cmp::min;
+use tui_input::Input;
 
 use crate::{
     operations::Operation,
@@ -54,8 +55,11 @@ impl App {
         let cursor_position = backend.cursor_position();
         let offset = BufferDisplayOffset::default();
         let buffer_state = BufferDisplayState::new(buffer_contents, cursor_position, offset);
-
-        let ui_state = UIState { buffer_state };
+        let file_input = Some(Input::default());
+        let ui_state = UIState {
+            buffer_state,
+            file_input,
+        };
 
         App {
             exit: false,
@@ -109,7 +113,7 @@ impl App {
     }
 
     /// Render the contents of the currently opened buffer in a given Rect
-    fn render_buffer_contents(&mut self, area: layout::Rect, buf: &mut ratatui::prelude::Buffer) {
+    fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         // 1) Sync the in-memory state with the backend’s latest data
         self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
         self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
@@ -219,7 +223,7 @@ impl App {
         let (base_x, base_y) = Self::base_rect_position(&area);
 
         let buffer_cursor_position = buffer.cursor.position;
-        let offset = &self.ui_state.buffer_offset;
+        let offset = &self.ui_state.buffer_state.offset;
 
         TerminalPosition {
             x: min(
@@ -573,9 +577,10 @@ mod tests {
         assert_eq!(buf, expected)
     }
 
+    #[allow(dead_code)]
     /// Helper function to assert the position to render the cursor at in the visible
     /// buffer after syncing the buffer contents and cursor position from the backend.
-    fn assert_cursor_render_pos(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
+    fn assert_cursor_render_pos_no_input(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
         // 1) Sync the in-memory state with the backend’s latest data
         app.ui_state.buffer_state.buffer_contents = app.backend.current_buffer_contents();
         app.ui_state.buffer_state.cursor_position = app.backend.cursor_position();
