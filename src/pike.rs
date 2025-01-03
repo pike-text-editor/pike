@@ -195,13 +195,13 @@ impl Pike {
     }
 
     /// Switch to the previous buffer
-    fn previous_buffer(&mut self) {
-        todo!()
+    pub fn previous_buffer(&mut self) {
+        self.workspace.previous_buffer();
     }
 
     /// Switch to the next buffer
-    fn next_buffer(&mut self) {
-        todo!()
+    pub fn next_buffer(&mut self) {
+        self.workspace.next_buffer();
     }
 
     /// Search for a query in the current buffer and return
