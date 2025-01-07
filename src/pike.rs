@@ -99,6 +99,46 @@ impl Pike {
         }
     }
 
+    /// Deletes a characted and moves the cursor left
+    pub fn delete_character_from_current_buffer(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            let pos = buffer.cursor.position;
+            let data = buffer.data();
+
+            let lines: Vec<&str> = data.split('\n').collect();
+
+            let current_line_length = lines.get(pos.line).map_or(0, |line| line.len());
+
+            if pos.offset == 0 && pos.line > 0 {
+                buffer.cursor.move_up();
+
+                let new_offset = {
+                    let new_pos = buffer.cursor.position.line;
+                    lines.get(new_pos).map_or(0, |line| line.len())
+                };
+
+                buffer.cursor.move_to(scribe::buffer::Position {
+                    line: buffer.cursor.position.line,
+                    offset: new_offset,
+                });
+
+                // Delete here so it removes the newline
+                buffer.delete();
+            } else {
+                if pos.offset > 0 {
+                    buffer.cursor.move_left();
+                    buffer.delete();
+                }
+            }
+            // Mark as changed when succesfull
+            if pos.offset != 0 {
+                if let Some(path) = self.current_buffer_path() {
+                    self.saved_state.insert(path, false);
+                }
+            }
+        }
+    }
+
     /// Returns the contents of the currently opened buffer or
     /// an empty string if none is open
     pub fn current_buffer_contents(&self) -> String {
