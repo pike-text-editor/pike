@@ -138,10 +138,11 @@ render_cursor_position = self
 
     /// Render the status bar in a given Rect
     fn render_status_bar(&self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
-        // TODO: come back to this when text insertion is implemented to display saved/unsaved
-        // changes info
-        let filename = self.backend.current_buffer_filename();
-        let text_widget = Text::from(filename);
+                let filename = self.backend.current_buffer_filename();
+let is_saved = self.backend.is_current_buffer_saved();
+
+        let indicator = if is_saved { "" } else { "*" };
+        let text_widget = Text::from(format!("{}{}", filename, indicator));
 
         let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
         let block_widget = paragraph_widget.block(Block::default().borders(Borders::TOP));
