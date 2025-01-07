@@ -6,6 +6,7 @@ use ratatui::{
 };
 use scribe::buffer::Position as BufferPosition;
 use std::cmp::min;
+use std::rc::Rc;
 use tui_input::Input;
 
 /// We would like to have some struct which can be rendered
@@ -18,6 +19,11 @@ use tui_input::Input;
 #[allow(dead_code)]
 struct Picker {}
 
+pub enum CursorCalculationMode<'a> {
+    FileInput(&'a Input),
+    Buffer,
+}
+
 /// Holds the information about the current state of the UI
 /// of the app.
 #[allow(dead_code)]
@@ -26,6 +32,79 @@ pub struct UIState {
     /// Offset of the currently rendered buffer
     pub buffer_state: BufferDisplayState,
     pub file_input: Option<Input>,
+}
+
+impl UIState {
+    /// Calculate the cursor position for a given `CursorCalculation` mode
+    pub fn calculate_cursor_position(
+        &self,
+        calc_mode: CursorCalculationMode,
+        layout: &Rc<[Rect]>,
+    ) -> TerminalPosition {
+        let main_area = 1;
+        let status_bar_area = 0;
+
+        match calc_mode {
+            CursorCalculationMode::FileInput(input) => {
+                self.calculate_cursor_for_file_input(input, layout[main_area])
+            }
+            CursorCalculationMode::Buffer => {
+                self.calculate_cursor_for_buffer(layout[status_bar_area])
+            }
+        }
+    }
+
+    /// Calculate position for file input
+    pub fn calculate_cursor_for_file_input(&self, input: &Input, area: Rect) -> TerminalPosition {
+        let border_offset = 1;
+
+        let max_x = {
+            let (x, _) = Self::max_rect_position(&area);
+            x.saturating_sub(border_offset)
+        };
+
+        let (base_x, base_y) = {
+            let (x, y) = Self::base_rect_position(&area);
+            (x + border_offset, y)
+        };
+
+        let offset = input.cursor() as u16;
+
+        TerminalPosition::new(min(base_x + offset, max_x), base_y + border_offset)
+    }
+
+    /// Calculate position for buffer
+    pub fn calculate_cursor_for_buffer(&self, area: Rect) -> TerminalPosition {
+        // If we have a cursor position, compute accordingly;
+        // otherwise return a default
+        if let Some(cursor_pos) = &self.buffer_state.cursor_position {
+            let (max_x, max_y) = Self::max_rect_position(&area);
+            let (base_x, base_y) = Self::base_rect_position(&area);
+
+            let x_offset = self.buffer_state.offset.x as u16;
+            let y_offset = self.buffer_state.offset.y as u16;
+
+            let x = (base_x + cursor_pos.offset as u16).saturating_sub(x_offset);
+            let y = (base_y + cursor_pos.line as u16).saturating_sub(y_offset);
+
+            TerminalPosition {
+                x: min(x, max_x),
+                y: min(y, max_y),
+            }
+        } else {
+            TerminalPosition::default()
+        }
+    }
+
+    /// Calculate the maximum renderable position in a given area
+    fn max_rect_position(area: &Rect) -> (u16, u16) {
+        (area.width.saturating_sub(1), area.height.saturating_sub(1))
+    }
+
+    /// Calculate the base (top-left) position in a given area
+    fn base_rect_position(area: &Rect) -> (u16, u16) {
+        (area.x, area.y)
+    }
 }
 
 /// Holds the information how much offset is the
