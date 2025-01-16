@@ -464,7 +464,6 @@ mod tests {
             }
 
             CursorRenderingWidget::FileInput => {
-                // If we’re testing file input, just call the file-input cursor function.
                 let input = app
                     .ui_state
                     .file_input
@@ -551,7 +550,7 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    /// Helper function to   assert the position to render the cursor at in the visible
+    /// Helper function to assert the position to render the cursor at in the visible
     /// buffer after syncing the buffer contents and cursor position from the backend.
     fn assert_cursor_render_pos_no_input(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
         let cursor_position = app.backend.cursor_position();
@@ -641,8 +640,8 @@ mod tests {
         assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["23"]);
     }
 
-    // The buffer contents should shift down so that lines that
-    // are too long to render can be inspected by moving further down.
+    /// The buffer contents should shift down so that lines that
+    /// are too long to render can be inspected by moving further down.
     #[test]
     fn test_buffer_shifts_when_moving_outside_visible_lines() {
         let mut app = app_with_file_contents("123\n456\n789");

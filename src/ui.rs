@@ -201,8 +201,7 @@ impl BufferDisplayState {
 
 /// Widget for displaying the buffer contents. Serves as a thin wrapper
 /// to lift the responsibility of actually rendering the contents from the
-/// app itself, so it does not copy the data, but itself receives references
-/// as it's created on every app render.
+/// app itself
 pub struct BufferDisplayWidget<'a> {
     pub buffer_contents: &'a str,
     pub cursor_position: Option<BufferPosition>,
