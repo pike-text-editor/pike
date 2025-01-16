@@ -395,6 +395,7 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use ratatui::{buffer::Buffer, layout::Rect};
     use tempfile::NamedTempFile;
+    use tui_input::InputRequest;
 
     use crate::test_util::{
         temp_file_with_contents,
@@ -554,20 +555,20 @@ mod tests {
         assert_eq!(pos, expected.into());
     }
     /// The cursor should not move past the bounds of the buffer
-    // #[test]
-    // fn test_cant_move_cursor_too_far_right() {
-    //     let mut app = app_with_file_contents("t");
-    //     let buf = Buffer::empty(Rect::new(0, 0, 10, 1));
+    #[test]
+    fn test_cant_move_cursor_too_far_right() {
+        let mut app = app_with_file_contents("t");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 1));
 
-    //     // Starts at (0, 0)
-    //     acrp_based_on_current_buffer(&mut app, &buf, (0, 0));
+        // Starts at (0, 0)
+        acrp_based_on_current_buffer(&mut app, &buf, (0, 0));
 
-    //     app.backend.move_cursor_right();
-    //     acrp_based_on_current_buffer(&mut app, &buf, (1, 0));
+        app.backend.move_cursor_right();
+        acrp_based_on_current_buffer(&mut app, &buf, (1, 0));
 
-    //     app.backend.move_cursor_right();
-    //     acrp_based_on_current_buffer(&mut app, &buf, (1, 0));
-    // }
+        app.backend.move_cursor_right();
+        acrp_based_on_current_buffer(&mut app, &buf, (1, 0));
+    }
 
     #[test]
     fn test_cant_move_cursor_too_far_down() {
@@ -612,13 +613,13 @@ mod tests {
         app.backend.move_cursor_right();
 
         // Verify initial buffer rendering after the first cursor move.
-        //assert_cursor_and_buffer(&mut app, &mut buf, (1, 0), vec!["34"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (1, 0), vec!["34"]);
 
         // Move left
         app.backend.move_cursor_left();
 
         // The cursor should now point at 3 and be at (0, 0)
-        //assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["34"]);
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["34"]);
 
         // Move left, the buffer should shift left
         app.backend.move_cursor_left();
@@ -644,77 +645,77 @@ mod tests {
     /// When the buffer gets shifted down, it should not shift back
     /// up until the first displayed line is reached, only the visible
     /// cursor should be moved up
-    // #[test]
-    // fn test_buffer_does_not_shift_up_until_necessary() {
-    //     let mut app = app_with_file_contents("123\n456\n789");
-    //     let mut buf = Buffer::empty(Rect::new(0, 0, 3, 2));
-    //     assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["123", "456"]);
+    #[test]
+    fn test_buffer_does_not_shift_up_until_necessary() {
+        let mut app = app_with_file_contents("123\n456\n789");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 3, 2));
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["123", "456"]);
 
-    //     // Move the cursor to the last line, shifting the buffer
-    //     app.backend.move_cursor_down();
-    //     app.backend.move_cursor_down();
+        // Move the cursor to the last line, shifting the buffer
+        app.backend.move_cursor_down();
+        app.backend.move_cursor_down();
 
-    //     // Verify initial buffer rendering after the first cursor move.
-    //     assert_cursor_and_buffer(&mut app, &mut buf, (0, 1), vec!["456", "789"]);
+        // Verify initial buffer rendering after the first cursor move.
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 1), vec!["456", "789"]);
 
-    //     // Move up
-    //     app.backend.move_cursor_up();
+        // Move up
+        app.backend.move_cursor_up();
 
-    //     // The cursor should now point at 4 and be at (0, 0)
-    //     assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["456", "789"]);
+        // The cursor should now point at 4 and be at (0, 0)
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["456", "789"]);
 
-    //     // Move up, the buffer should shift up
-    //     app.backend.move_cursor_up();
-    //     assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["123", "456"]);
-    // }
+        // Move up, the buffer should shift up
+        app.backend.move_cursor_up();
+        assert_cursor_and_buffer(&mut app, &mut buf, (0, 0), vec!["123", "456"]);
+    }
 
-    // #[test]
-    // fn test_cursor_position_file_input() {
-    //     let mut app = app_with_file_contents("");
-    //     let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
+    #[test]
+    fn test_cursor_position_file_input() {
+        let mut app = app_with_file_contents("");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
 
-    //     app.open_file_input("");
-    //     acrp_based_on_file_input(&mut app, &buf, (1, 1));
+        app.open_file_input("");
+        acrp_based_on_file_input(&mut app, &buf, (1, 1));
 
-    //     // Insert a char
-    //     app.ui_state
-    //         .file_input
-    //         .as_mut()
-    //         .expect("A file input has been opened, it can't be none")
-    //         .handle(InputRequest::InsertChar('h'));
+        // Insert a char
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::InsertChar('h'));
 
-    //     acrp_based_on_file_input(&mut app, &buf, (2, 1));
+        acrp_based_on_file_input(&mut app, &buf, (2, 1));
 
-    //     // Move cursor left
-    //     app.ui_state
-    //         .file_input
-    //         .as_mut()
-    //         .expect("A file input has been opened, it can't be none")
-    //         .handle(InputRequest::GoToPrevChar);
+        // Move cursor left
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::GoToPrevChar);
 
-    //     acrp_based_on_file_input(&mut app, &buf, (1, 1));
+        acrp_based_on_file_input(&mut app, &buf, (1, 1));
 
-    //     // And right, then delete a char
-    //     app.ui_state
-    //         .file_input
-    //         .as_mut()
-    //         .expect("A file input has been opened, it can't be none")
-    //         .handle(InputRequest::GoToNextChar);
+        // And right, then delete a char
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::GoToNextChar);
 
-    //     app.ui_state
-    //         .file_input
-    //         .as_mut()
-    //         .expect("A file input has been opened, it can't be none")
-    //         .handle(InputRequest::DeletePrevChar);
+        app.ui_state
+            .file_input
+            .as_mut()
+            .expect("A file input has been opened, it can't be none")
+            .handle(InputRequest::DeletePrevChar);
 
-    //     acrp_based_on_file_input(&mut app, &buf, (1, 1));
+        acrp_based_on_file_input(&mut app, &buf, (1, 1));
 
-    //     // Now some overflow
-    //     let buf = Buffer::empty(Rect::new(0, 0, 4, 1));
-    //     app.open_file_input("hello, world!");
-    //     // Does not reach (3, 1) because of the border
-    //     acrp_based_on_file_input(&mut app, &buf, (2, 1))
-    // }
+        // Now some overflow
+        let buf = Buffer::empty(Rect::new(0, 0, 4, 1));
+        app.open_file_input("hello, world!");
+        // Does not reach (3, 1) because of the border
+        acrp_based_on_file_input(&mut app, &buf, (2, 1))
+    }
 
     #[test]
     fn test_app_handles_keybinds() {
