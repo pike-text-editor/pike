@@ -170,19 +170,13 @@ impl BufferDisplayState {
     }
 }
 
-/// Widget for displaying the buffer contents. Serves as a thin wrapper
-/// to lift the responsibility of actually rendering the contents from the
-/// app itself, so it does not copy the data, but itself receives references
-/// as it's created on every app render.
+/// Widget for displaying the buffer contents.
 pub struct BufferDisplayWidget;
 
 impl StatefulWidget for BufferDisplayWidget {
-    /// For this example, we won't store extra "widget state"
-    /// outside of what's already in `BufferDisplay`, so we use `()`.
+    /// State of the buffer display
     type State = BufferDisplayState;
 
-    /// Render the widget. Notice that `render` here includes a `state` parameter
-    /// which you can use if you need separate "runtime" state.
     fn render(
         self,
         area: ratatui::prelude::Rect,
@@ -199,7 +193,6 @@ impl StatefulWidget for BufferDisplayWidget {
         let text_widget = Text::from(shifted_contents);
         let paragraph_widget = Paragraph::new(text_widget);
 
-        // We need the Widget trait to be in scope for .render(...) to work
         paragraph_widget.render(area, buf);
     }
 }
