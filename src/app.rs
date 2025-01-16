@@ -15,7 +15,7 @@ use crate::{
     pike::Pike,
     ui::{
         BufferDisplayOffset, BufferDisplayState, BufferDisplayWidget, CursorCalculationMode,
-        FileInput, UIState,
+        FileInput, FileInputRole, UIState,
     },
 };
 
@@ -67,6 +67,14 @@ impl App {
         }
     }
 
+    /// Builds an app with the default configuration and no open file
+    fn build_default() -> Self {
+        App::build(Args {
+            config: None,
+            file: None,
+        })
+    }
+
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         loop {
             if self.exit {
@@ -92,10 +100,10 @@ impl App {
 
         let file_input_value = self.ui_state.file_input.clone();
 
-        if let Some(ref input) = file_input_value {
+        if let Some(ref input_state) = file_input_value {
             self.render_file_input(status_bar_area, frame.buffer_mut());
             render_cursor_position = self.ui_state.calculate_cursor_position(
-                CursorCalculationMode::FileInput(input),
+                CursorCalculationMode::FileInput(&input_state.input),
                 &layout,
                 cursor_pos,
             );
@@ -162,13 +170,13 @@ impl App {
             self.ui_state
                 .file_input
                 .as_mut()
-                .expect("None case has been handled"),
+                .expect("None case was handled"),
         );
     }
 
     /// Open a file input with the given contents and store it in UIState
-    fn open_file_input(&mut self, contents: &str) {
-        self.ui_state.file_input = Some(contents.into());
+    fn open_file_input(&mut self, contents: &str, role: FileInputRole) {
+        self.ui_state.file_input = Some((contents, role).into());
     }
 
     /// Close the currently open file input
@@ -203,38 +211,49 @@ impl App {
 
     /// Try to handle the key press using a file input. Returns a boolean
     /// indicating whether the event has been handled or not.
-    fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> bool {
+    fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
         // No input means the event can't be handled
         let input = match self.ui_state.file_input.as_mut() {
             Some(input) => input,
-            None => return false,
+            None => return Ok(false),
         };
 
-        // Open a new file and close the input
+        // Perform the corresponding operation and close the input
         if (key.code, key.modifiers) == (KeyCode::Enter, KeyModifiers::NONE) {
-            let path = PathBuf::from(input.to_string());
-            self.backend
-                .create_and_open_file(&path)
-                // TODO: display message in the UI
-                .expect("Error opening file!");
+            let path = input.to_path();
+            match input.role {
+                FileInputRole::GetOpenPath => self.open_file_from_path(path),
+                FileInputRole::GetSavePath => self.backend.bind_current_buffer_to_path(path),
+            }
+            self.backend.save_current_buffer().map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("Error saving buffer: {}", e))
+            })?;
+
             self.close_file_input();
-            return true;
+            return Ok(true);
         }
 
         // Close the input
         if (key.code, key.modifiers) == (KeyCode::Esc, KeyModifiers::NONE) {
             self.close_file_input();
-            return true;
+            return Ok(true);
         }
 
         // Try to create a request to the file input and handle it
         match Self::key_event_to_input_request(key) {
             Some(request) => {
                 input.handle(request);
-                true
+                Ok(true)
             }
-            None => false,
+            None => Ok(false),
         }
+    }
+
+    fn open_file_from_path(&mut self, path: PathBuf) {
+        self.backend
+            .create_and_open_file(&path)
+            // TODO: display message in the UI
+            .expect("Error opening file!");
     }
 
     /// Try to convert a given key event to an InputRequest to be sent to a tui_input::Input
@@ -258,7 +277,7 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
-        if self.try_handle_key_press_with_file_input(key) {
+        if self.try_handle_key_press_with_file_input(key)? {
             return Ok(());
         }
 
@@ -347,7 +366,7 @@ impl App {
     fn handle_operation(&mut self, op: &Operation) {
         match op {
             Operation::OpenFile => {
-                self.open_file_input("");
+                self.open_file_input("", FileInputRole::GetOpenPath);
             }
             Operation::Quit => {
                 self.exit();
@@ -355,16 +374,11 @@ impl App {
             Operation::CreateNewBuffer => self.backend.open_new_buffer(),
             Operation::SwitchToPreviousBuffer => self.backend.previous_buffer(),
             Operation::SwitchToNextBuffer => self.backend.next_buffer(),
+            Operation::SaveBufferToFile => self.handle_save_operation(),
 
             Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
             Operation::SearchAndReplaceInCurrentBuffer => {
                 todo!("Handle SearchAndReplaceInCurrentBuffer operation")
-            }
-
-            Operation::SaveBufferToFile => {
-                if let Err(err) = self.backend.save_current_buffer() {
-                    eprintln!("Failed to save buffer: {}", err);
-                }
             }
 
             Operation::Undo => todo!("Handle Undo operation"),
@@ -374,6 +388,17 @@ impl App {
             Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
             Operation::FindTextInCWD => todo!("Handle FindTextInCWD operation"),
             Operation::OpenBufferPicker => todo!("Handle OpenBufferPicker operation"),
+        }
+    }
+
+    fn handle_save_operation(&mut self) {
+        if let Some(path) = self.backend.current_buffer_path() {
+            if let Err(err) = self.backend.save_current_buffer() {
+                eprintln!("Failed to save buffer: {}", err);
+            }
+        } else {
+            // Ask for filepath if the buffer is not bound to one
+            self.open_file_input("", FileInputRole::GetSavePath);
         }
     }
 }
@@ -397,9 +422,13 @@ mod tests {
     use tempfile::NamedTempFile;
     use tui_input::InputRequest;
 
-    use crate::test_util::{
-        temp_file_with_contents,
-        ui::{n_spaces, solid_border},
+    use crate::{
+        operations::Operation,
+        test_util::{
+            temp_file_with_contents,
+            ui::{n_spaces, solid_border},
+        },
+        ui::FileInputRole,
     };
 
     use super::App;
@@ -470,7 +499,7 @@ mod tests {
                     .as_ref()
                     .expect("A file input should be open when testing cursor in file input");
                 app.ui_state
-                    .calculate_cursor_for_file_input(input, buf.area)
+                    .calculate_cursor_for_file_input(&input.input, buf.area)
             }
         };
 
@@ -688,7 +717,7 @@ mod tests {
         let mut app = app_with_file_contents("");
         let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
 
-        app.open_file_input("");
+        app.open_file_input("", FileInputRole::GetOpenPath);
         acrp_based_on_file_input(&mut app, &buf, (1, 1));
 
         // Insert a char
@@ -726,7 +755,7 @@ mod tests {
 
         // Now some overflow
         let buf = Buffer::empty(Rect::new(0, 0, 4, 1));
-        app.open_file_input("hello, world!");
+        app.open_file_input("hello, world!", FileInputRole::GetOpenPath);
         // Does not reach (3, 1) because of the border
         acrp_based_on_file_input(&mut app, &buf, (2, 1))
     }
@@ -746,9 +775,39 @@ mod tests {
         app.handle_key_event(open_file_event)
             .expect("Failed to handle key event");
         assert!(app.ui_state.file_input.is_some());
+        assert_eq!(
+            app.ui_state
+                .file_input
+                .as_ref()
+                .expect("None case was handled")
+                .role,
+            FileInputRole::GetOpenPath
+        );
 
         app.handle_key_event(close_event)
             .expect("Failed to handle key event");
         assert!(app.exit)
+    }
+
+    #[test]
+    fn app_does_not_ask_for_save_path_if_there_is_one() {
+        let mut app = app_with_file_contents("hello, world!");
+
+        app.handle_operation(&Operation::SaveBufferToFile);
+
+        assert!(app.ui_state.file_input.is_none());
+    }
+
+    #[test]
+    fn app_asks_for_save_path_if_there_is_none() {
+        let mut app = App::build_default();
+
+        app.handle_operation(&Operation::SaveBufferToFile);
+
+        assert!(app.ui_state.file_input.is_some());
+        assert_eq!(
+            app.ui_state.file_input.as_ref().unwrap().role,
+            FileInputRole::GetSavePath
+        );
     }
 }

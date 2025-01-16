@@ -37,9 +37,13 @@ impl Pike {
             Workspace::new(&cwd, None).map_err(|e| format!("Error creating workspace: {}", e))?;
 
         if let Some(cwf) = cwf {
+            // Open the given file
             workspace
                 .open_buffer(cwf.as_path())
                 .map_err(|_| "Error opening file")?;
+        } else {
+            // Open an empty buffer with no path
+            workspace.add_buffer(Buffer::new());
         }
 
         Ok(Pike {
@@ -286,6 +290,13 @@ impl Pike {
     pub fn get_keymap(&self, mapping: &KeyShortcut) -> Option<&Operation> {
         self.config.key_mappings.get(mapping)
     }
+
+    /// Sets a path for the current buffer
+    pub fn bind_current_buffer_to_path(&mut self, path: PathBuf) {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            buf.path = Some(path);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -336,7 +347,11 @@ mod pike_test {
         let (pike, cwd) = tmp_pike_and_working_dir(None, None);
 
         assert_eq!(pike.workspace.path, cwd);
-        assert!(pike.current_buffer().is_none());
+        assert!(pike
+            .current_buffer()
+            .expect("A buffer should open by default")
+            .path
+            .is_none());
         assert!(pike.config == Config::default());
     }
 
@@ -454,14 +469,11 @@ mod pike_test {
     }
 
     #[test]
-    fn test_write_to_nonexisting_buffer() {
+    fn test_write_to_default_buffer() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
         let result = pike.write_to_current_buffer("Hello, world!");
-
-        assert_eq!(
-            result,
-            Err("Trying to write to a non-existent buffer".to_string())
-        );
+        assert!(result.is_ok());
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!");
     }
 
     #[test]
@@ -478,14 +490,12 @@ mod pike_test {
     }
 
     #[test]
-    fn test_save_nonexisting_buffer() {
+    #[should_panic]
+    fn test_save_buffer_no_path() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
-        let result = pike.save_current_buffer();
-
-        assert_eq!(
-            result,
-            Err("Trying to save a non-existent buffer".to_string())
-        );
+        // This situation should not happen as it's handled in the UI, so a panic here
+        // is expected
+        let _ = pike.save_current_buffer();
     }
 
     #[test]
@@ -551,7 +561,7 @@ mod pike_test {
     fn test_has_unsaved_changes_no_buffer() {
         let pike = tmp_pike_and_working_dir(None, None).0;
 
-        assert!(!pike.has_unsaved_changes());
+        assert!(pike.has_unsaved_changes());
     }
 
     /// When moving down to a shorter line, the
@@ -678,9 +688,11 @@ mod pike_test {
     fn test_open_new_buffer() {
         let file = temp_file_with_contents("Hello, world!");
         let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+        assert_eq!(pike.workspace.buffer_paths().len(), 1);
 
         pike.open_file(file.path(), 0, 0)
             .expect("Failed to open file");
+        assert_eq!(pike.workspace.buffer_paths().len(), 2);
 
         // Should be empty with no path
         pike.open_new_buffer();
@@ -690,9 +702,24 @@ mod pike_test {
             .expect("A buffer should be open")
             .path
             .is_none());
+        assert_eq!(pike.workspace.buffer_paths().len(), 3);
+    }
 
-        // Another one, should be three buffers alltogether
-        pike.open_new_buffer();
-        assert_eq!(pike.workspace.buffer_paths().len(), 3)
+    #[test]
+    fn test_bind_current_buffer_to_path() {
+        let file_contents = "Hello, world!";
+        let (mut pike, dir) = tmp_pike_and_working_dir(None, None);
+        assert!(pike.current_buffer_path().is_none());
+        pike.write_to_current_buffer(file_contents)
+            .expect("Failed to write to current buffer");
+
+        let file_path = dir.join(Path::new("new_file.txt"));
+        pike.bind_current_buffer_to_path(file_path.clone());
+
+        assert!(pike.save_current_buffer().is_ok());
+
+        let contents_from_file =
+            fs::read_to_string(file_path).expect("std::fs failed to read from file");
+        assert_eq!(file_contents, contents_from_file)
     }
 }
