@@ -12,9 +12,9 @@ use tui_input::Input;
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
 /// selected (similarly to telescope.nvim) so that we can reuse
-/// it when searching for files or word occurences in the cwd
+/// it when searching for files or word occurrences in the cwd
 /// As of now, I can't look that far into the future without writing
-/// some code to know what fields this should keep and how it shoul
+/// some code to know what fields this should keep and how it should
 /// behave, so it's empty
 #[allow(dead_code)]
 struct Picker {}
@@ -180,7 +180,7 @@ impl BufferDisplayState {
     }
 
     /// Shifts the content of the buffer down by the offset and returns the resulting string.
-    /// Basically removes the first self.offset.y lines and joins the remanining ones.
+    /// Basically removes the first self.offset.y lines and joins the remaining ones.
     fn shift_contents_down(&mut self, contents: String) -> String {
         contents
             .lines()
@@ -271,7 +271,7 @@ impl StatefulWidget for BufferDisplayWidget {
 }
 
 /// A widget for displaying a text input passed to it as a state
-/// In the future might need factoring out to accomodate other UI
+/// In the future might need factoring out to accommodate other UI
 /// elements that need such functionality and just have a title
 /// and callback passed to it as arguments
 #[derive(Default)]
