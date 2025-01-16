@@ -131,11 +131,9 @@ impl Pike {
 
                 // Delete here so it removes the newline
                 buffer.delete();
-            } else {
-                if pos.offset > 0 {
-                    buffer.cursor.move_left();
-                    buffer.delete();
-                }
+            } else if pos.offset > 0 {
+                buffer.cursor.move_left();
+                buffer.delete();
             }
             // Mark as changed when succesfull
             if pos.offset != 0 {

@@ -332,13 +332,13 @@ impl App {
             KeyCode::Enter => {
                 let _ = self.backend.write_to_current_buffer("\n");
                 self.backend.move_cursor_down();
-                return true;
+                true
             }
             KeyCode::Backspace => {
-                let _ = self.backend.delete_character_from_current_buffer();
-                return true;
+                self.backend.delete_character_from_current_buffer();
+                true
             }
-            _ => return false,
+            _ => false,
         }
     }
 
@@ -395,7 +395,6 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use ratatui::{buffer::Buffer, layout::Rect};
     use tempfile::NamedTempFile;
-    use tui_input::InputRequest;
 
     use crate::test_util::{
         temp_file_with_contents,
