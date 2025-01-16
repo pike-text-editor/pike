@@ -28,6 +28,19 @@ pub struct UIState {
     pub file_input: Option<Input>,
 }
 
+impl UIState {
+    pub fn new(buffer_contents: String, cursor_position: Option<BufferPosition>) -> UIState {
+        UIState {
+            buffer_state: BufferDisplayState::new(
+                buffer_contents,
+                cursor_position,
+                BufferDisplayOffset::default(),
+            ),
+            file_input: None,
+        }
+    }
+}
+
 /// Holds the information how much offset is the
 /// current buffer when displayed - for example, it's
 /// displayed from line 6 until either the end of the buffer ->

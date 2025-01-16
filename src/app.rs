@@ -10,12 +10,11 @@ use ratatui::{
     Terminal,
 };
 use std::cmp::min;
-use tui_input::Input;
 
 use crate::{
     operations::Operation,
     pike::Pike,
-    ui::{BufferDisplayOffset, BufferDisplayState, BufferDisplayWidget, FileInput, UIState},
+    ui::{BufferDisplayWidget, FileInput, UIState},
 };
 
 /// TUI application which displays the UI and handles events
@@ -53,13 +52,7 @@ impl App {
     fn new(backend: Pike) -> App {
         let buffer_contents = backend.current_buffer_contents();
         let cursor_position = backend.cursor_position();
-        let offset = BufferDisplayOffset::default();
-        let buffer_state = BufferDisplayState::new(buffer_contents, cursor_position, offset);
-        let file_input = Some(Input::default());
-        let ui_state = UIState {
-            buffer_state,
-            file_input,
-        };
+        let ui_state = UIState::new(buffer_contents, cursor_position);
 
         App {
             exit: false,
@@ -114,13 +107,18 @@ impl App {
 
     /// Render the contents of the currently opened buffer in a given Rect
     fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
-        // 1) Sync the in-memory state with the backend’s latest data
-        self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
-        self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
+        self.sync_buffer_state_with_ui_state();
 
-        // 2) Render using our new StatefulWidget
         let widget = BufferDisplayWidget;
         widget.render(area, buf, &mut self.ui_state.buffer_state);
+    }
+
+    /// Sync the buffer state with the UI state so that the UI receives the fresh cursor position
+    /// and buffer contents
+    /// TODO: make them references pointing to the correct backend vars instead
+    fn sync_buffer_state_with_ui_state(&mut self) {
+        self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
+        self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
     }
 
     /// Render the status bar in a given Rect
@@ -135,19 +133,6 @@ impl App {
 
         block_widget.render(area, buf);
     }
-
-    // /// Renders the cursor in the current buffer
-    // fn render_cursor(&mut self, area: layout::Rect, frame: &mut ratatui::prelude::Frame) {
-    //     // Also sync state with backend
-    //     self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
-    //     self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
-
-    //     // Then just compute the cursor position
-    //     let pos = self
-    //         .ui_state
-    //         .buffer_state
-    //         .calculate_cursor_render_position(area);
-    //     frame.set_cursor_position(pos);
 
     /// Render the cursor in a given position
     fn render_cursor(&self, frame: &mut ratatui::prelude::Frame, position: TerminalPosition) {
