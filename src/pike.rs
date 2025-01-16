@@ -89,13 +89,46 @@ impl Pike {
     }
 
     /// Writes `text` to current buffer
-    fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
+    pub fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
                 buffer.insert(text);
+
                 Ok(())
             }
             None => Err("Trying to write to a non-existent buffer".to_string()),
+        }
+    }
+
+    /// Deletes a characted and moves the cursor left
+    pub fn delete_character_from_current_buffer(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            let pos = buffer.cursor.position;
+            let data = buffer.data();
+
+            let lines: Vec<&str> = data.split('\n').collect();
+
+            let current_line_length = lines.get(pos.line).map_or(0, |line| line.len());
+
+            if pos.offset == 0 && pos.line > 0 {
+                buffer.cursor.move_up();
+
+                let new_offset = {
+                    let new_pos = buffer.cursor.position.line;
+                    lines.get(new_pos).map_or(0, |line| line.len())
+                };
+
+                buffer.cursor.move_to(scribe::buffer::Position {
+                    line: buffer.cursor.position.line,
+                    offset: new_offset,
+                });
+
+                // Delete here so it removes the newline
+                buffer.delete();
+            } else if pos.offset > 0 {
+                buffer.cursor.move_left();
+                buffer.delete();
+            }
         }
     }
 
@@ -216,13 +249,21 @@ impl Pike {
     }
 
     /// Save the current buffer to its file
-    fn save_current_buffer(&mut self) -> Result<(), String> {
+    pub fn save_current_buffer(&mut self) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
                 buffer.save().expect("Failed to save buffer");
+
                 Ok(())
             }
             None => Err("Trying to save a non-existent buffer".to_string()),
+        }
+    }
+
+    pub fn is_current_buffer_modified(&self) -> bool {
+        match self.current_buffer() {
+            Some(buffer) => buffer.modified(),
+            None => false,
         }
     }
 

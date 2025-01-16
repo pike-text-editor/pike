@@ -6,17 +6,23 @@ use ratatui::{
 };
 use scribe::buffer::Position as BufferPosition;
 use std::cmp::min;
+use std::rc::Rc;
 use tui_input::Input;
 
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
 /// selected (similarly to telescope.nvim) so that we can reuse
-/// it when searching for files or word occurences in the cwd
+/// it when searching for files or word occurrences in the cwd
 /// As of now, I can't look that far into the future without writing
-/// some code to know what fields this should keep and how it shoul
+/// some code to know what fields this should keep and how it should
 /// behave, so it's empty
 #[allow(dead_code)]
 struct Picker {}
+
+pub enum CursorCalculationMode<'a> {
+    FileInput(&'a Input),
+    Buffer,
+}
 
 /// Holds the information about the current state of the UI
 /// of the app.
@@ -29,15 +35,80 @@ pub struct UIState {
 }
 
 impl UIState {
-    pub fn new(buffer_contents: String, cursor_position: Option<BufferPosition>) -> UIState {
-        UIState {
-            buffer_state: BufferDisplayState::new(
-                buffer_contents,
-                cursor_position,
-                BufferDisplayOffset::default(),
-            ),
-            file_input: None,
+    /// Calculate the cursor position for a given `CursorCalculation` mode
+    pub fn calculate_cursor_position(
+        &self,
+        calc_mode: CursorCalculationMode,
+        layout: &Rc<[Rect]>,
+        cursor_pos: Option<BufferPosition>,
+    ) -> TerminalPosition {
+        let main_area = 1;
+        let status_bar_area = 0;
+
+        match calc_mode {
+            CursorCalculationMode::FileInput(input) => {
+                self.calculate_cursor_for_file_input(input, layout[main_area])
+            }
+            CursorCalculationMode::Buffer => {
+                self.calculate_cursor_for_buffer(layout[status_bar_area], cursor_pos)
+            }
         }
+    }
+
+    /// Calculate position for file input
+    pub fn calculate_cursor_for_file_input(&self, input: &Input, area: Rect) -> TerminalPosition {
+        let border_offset = 1;
+
+        let max_x = {
+            let (x, _) = Self::max_rect_position(&area);
+            x.saturating_sub(border_offset)
+        };
+
+        let (base_x, base_y) = {
+            let (x, y) = Self::base_rect_position(&area);
+            (x + border_offset, y)
+        };
+
+        let offset = input.cursor() as u16;
+
+        TerminalPosition::new(min(base_x + offset, max_x), base_y + border_offset)
+    }
+
+    /// Calculate position for buffer
+    pub fn calculate_cursor_for_buffer(
+        &self,
+        area: Rect,
+        cursor_pos: Option<BufferPosition>,
+    ) -> TerminalPosition {
+        // If we have a cursor position, compute accordingly;
+        // otherwise return a default
+        if let Some(cursor_pos) = cursor_pos {
+            let (max_x, max_y) = Self::max_rect_position(&area);
+            let (base_x, base_y) = Self::base_rect_position(&area);
+
+            let x_offset = self.buffer_state.offset.x as u16;
+            let y_offset = self.buffer_state.offset.y as u16;
+
+            let x = (base_x + cursor_pos.offset as u16).saturating_sub(x_offset);
+            let y = (base_y + cursor_pos.line as u16).saturating_sub(y_offset);
+
+            TerminalPosition {
+                x: min(x, max_x),
+                y: min(y, max_y),
+            }
+        } else {
+            TerminalPosition::default()
+        }
+    }
+
+    /// Calculate the maximum renderable position in a given area
+    fn max_rect_position(area: &Rect) -> (u16, u16) {
+        (area.width.saturating_sub(1), area.height.saturating_sub(1))
+    }
+
+    /// Calculate the base (top-left) position in a given area
+    fn base_rect_position(area: &Rect) -> (u16, u16) {
+        (area.x, area.y)
     }
 }
 
@@ -65,56 +136,41 @@ impl BufferDisplayOffset {
 #[derive(Default)]
 /// Represents the state of a buffer display, including its contents, cursor position, and offset.
 pub struct BufferDisplayState {
-    pub buffer_contents: String,
-    pub cursor_position: Option<BufferPosition>,
     pub offset: BufferDisplayOffset,
 }
 
 #[allow(dead_code)]
 impl BufferDisplayState {
-    pub fn new(
-        buffer_contents: String,
-        cursor_position: Option<BufferPosition>,
-        offset: BufferDisplayOffset,
-    ) -> Self {
-        BufferDisplayState {
-            buffer_contents,
-            cursor_position,
-            offset,
-        }
+    pub fn new(offset: BufferDisplayOffset) -> Self {
+        BufferDisplayState { offset }
     }
     /// Updates the x offset of the buffer so that the cursor is always visible
-    fn update_x_offset(&mut self, area: ratatui::prelude::Rect) {
-        let cursor_x = self.cursor_position.as_ref().map_or(0, |pos| pos.offset);
-
-        let too_far_right = cursor_x as u16 >= self.offset.x as u16 + area.width;
+    pub fn update_x_offset(&mut self, area: Rect, cursor_offset_x: usize) {
+        let too_far_right = cursor_offset_x as u16 >= self.offset.x as u16 + area.width;
         if too_far_right {
-            self.offset.x = cursor_x
+            self.offset.x = cursor_offset_x
                 .saturating_sub(area.width as usize)
                 .saturating_add(1);
         }
 
         // Ensure offset.x is never greater than cursor_x
-        self.offset.x = min(self.offset.x, cursor_x);
+        self.offset.x = self.offset.x.min(cursor_offset_x);
     }
 
-    /// Updates the y offset of the buffer so that the cursor is always visible
-    fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
-        let cursor_y = self.cursor_position.as_ref().map_or(0, |pos| pos.line);
-
-        let too_far_down = cursor_y as u16 >= self.offset.y as u16 + area.height;
+    pub fn update_y_offset(&mut self, area: Rect, cursor_line: usize) {
+        let too_far_down = cursor_line as u16 >= self.offset.y as u16 + area.height;
         if too_far_down {
-            self.offset.y = cursor_y
+            self.offset.y = cursor_line
                 .saturating_sub(area.height as usize)
                 .saturating_add(1);
         }
 
         // Ensure offset.y is never greater than cursor_y
-        self.offset.y = min(self.offset.y, cursor_y);
+        self.offset.y = self.offset.y.min(cursor_line);
     }
 
     /// Shifts the content of the buffer down by the offset and returns the resulting string.
-    /// Basically removes the first self.offset.y lines and joins the remanining ones.
+    /// Basically removes the first self.offset.y lines and joins the remaining ones.
     fn shift_contents_down(&mut self, contents: String) -> String {
         contents
             .lines()
@@ -141,40 +197,26 @@ impl BufferDisplayState {
         let down_shifted = self.shift_contents_down(contents);
         self.shift_contents_right(down_shifted)
     }
+}
 
-    /// Calculates the render position of the cursor in the given rect.
-    pub fn calculate_cursor_render_position(
-        &self,
-        area: ratatui::layout::Rect,
-    ) -> TerminalPosition {
-        use std::cmp::min;
+/// Widget for displaying the buffer contents. Serves as a thin wrapper
+/// to lift the responsibility of actually rendering the contents from the
+/// app itself
+pub struct BufferDisplayWidget<'a> {
+    pub buffer_contents: &'a str,
+    pub cursor_position: Option<BufferPosition>,
+}
 
-        let (max_x, max_y) = (area.width.saturating_sub(1), area.height.saturating_sub(1));
-        let (base_x, base_y) = (area.x, area.y);
-
-        let cursor_position = self
-            .cursor_position
-            .as_ref()
-            .unwrap_or(&BufferPosition { line: 0, offset: 0 });
-
-        TerminalPosition {
-            x: min(
-                (base_x + cursor_position.offset as u16).saturating_sub(self.offset.x as u16),
-                max_x,
-            ),
-            y: min(
-                (base_y + cursor_position.line as u16).saturating_sub(self.offset.y as u16),
-                max_y,
-            ),
+impl<'a> BufferDisplayWidget<'a> {
+    pub fn new(buffer_contents: &'a str, cursor_position: Option<BufferPosition>) -> Self {
+        Self {
+            buffer_contents,
+            cursor_position,
         }
     }
 }
 
-/// Widget for displaying the buffer contents.
-pub struct BufferDisplayWidget;
-
-impl StatefulWidget for BufferDisplayWidget {
-    /// State of the buffer display
+impl StatefulWidget for BufferDisplayWidget<'_> {
     type State = BufferDisplayState;
 
     fn render(
@@ -184,11 +226,12 @@ impl StatefulWidget for BufferDisplayWidget {
         state: &mut Self::State,
     ) {
         // Update offsets to keep cursor visible
-        state.update_x_offset(area);
-        state.update_y_offset(area);
-
+        if let Some(pos) = self.cursor_position {
+            state.update_x_offset(area, pos.offset);
+            state.update_y_offset(area, pos.line);
+        }
         // Shift contents based on offset
-        let shifted_contents = state.shift_contents(state.buffer_contents.clone());
+        let shifted_contents = state.shift_contents(self.buffer_contents.to_string());
         // Render the text using Paragraph
         let text_widget = Text::from(shifted_contents);
         let paragraph_widget = Paragraph::new(text_widget);
@@ -198,7 +241,7 @@ impl StatefulWidget for BufferDisplayWidget {
 }
 
 /// A widget for displaying a text input passed to it as a state
-/// In the future might need factoring out to accomodate other UI
+/// In the future might need factoring out to accommodate other UI
 /// elements that need such functionality and just have a title
 /// and callback passed to it as arguments
 #[derive(Default)]
