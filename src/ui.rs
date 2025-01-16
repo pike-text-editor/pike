@@ -1,6 +1,6 @@
 use ratatui::{
     buffer::Buffer,
-    layout::Rect,
+    layout::{Position as TerminalPosition, Rect},
     text::{Text, ToText},
     widgets::{self, Paragraph, StatefulWidget, Widget},
 };
@@ -17,6 +17,29 @@ use tui_input::Input;
 /// behave, so it's empty
 #[allow(dead_code)]
 struct Picker {}
+
+/// Holds the information about the current state of the UI
+/// of the app.
+#[allow(dead_code)]
+#[derive(Default)]
+pub struct UIState {
+    /// Offset of the currently rendered buffer
+    pub buffer_state: BufferDisplayState,
+    pub file_input: Option<Input>,
+}
+
+impl UIState {
+    pub fn new(buffer_contents: String, cursor_position: Option<BufferPosition>) -> UIState {
+        UIState {
+            buffer_state: BufferDisplayState::new(
+                buffer_contents,
+                cursor_position,
+                BufferDisplayOffset::default(),
+            ),
+            file_input: None,
+        }
+    }
+}
 
 /// Holds the information how much offset is the
 /// current buffer when displayed - for example, it's
@@ -39,89 +62,60 @@ impl BufferDisplayOffset {
     }
 }
 
-/// Holds the information about the current state of the UI
-/// of the app.
-#[allow(dead_code)]
 #[derive(Default)]
-pub struct UIState {
-    /// Offset of the currently rendered buffer
-    pub buffer_offset: BufferDisplayOffset,
-
-    /// Currently open file input
-    pub file_input: Option<Input>,
+/// Represents the state of a buffer display, including its contents, cursor position, and offset.
+pub struct BufferDisplayState {
+    pub buffer_contents: String,
+    pub cursor_position: Option<BufferPosition>,
+    pub offset: BufferDisplayOffset,
 }
 
-/// Widget for displaying the buffer contents. Serves as a thin wrapper
-/// to lift the responsibility of actually rendering the contents from the
-/// app itself, so it does not copy the data, but itself receives references
-/// as it's created on every app render.
 #[allow(dead_code)]
-pub struct BufferDisplay<'a> {
-    /// Contents of the buffer to render
-    buffer_contents: &'a str,
-
-    /// Current position of the cursor in the buffer
-    cursor_position: Option<&'a BufferPosition>,
-
-    /// Offset of the buffer being rendered
-    offset: &'a mut BufferDisplayOffset,
-}
-
-// TODO: think about refactoring to a stateful widget or widgetref
-impl BufferDisplay<'_> {
-    pub fn new<'a>(
-        buffer_contents: &'a str,
-        cursor_position: Option<&'a BufferPosition>,
-        offset: &'a mut BufferDisplayOffset,
-    ) -> BufferDisplay<'a> {
-        BufferDisplay {
+impl BufferDisplayState {
+    pub fn new(
+        buffer_contents: String,
+        cursor_position: Option<BufferPosition>,
+        offset: BufferDisplayOffset,
+    ) -> Self {
+        BufferDisplayState {
             buffer_contents,
             cursor_position,
             offset,
         }
     }
-
     /// Updates the x offset of the buffer so that the cursor is always visible
-    fn update_x_offset(&mut self, area: Rect) {
-        let cursor_x = self
-            .cursor_position
-            .unwrap_or(&BufferPosition { line: 0, offset: 0 })
-            .offset;
+    fn update_x_offset(&mut self, area: ratatui::prelude::Rect) {
+        let cursor_x = self.cursor_position.as_ref().map_or(0, |pos| pos.offset);
 
         let too_far_right = cursor_x as u16 >= self.offset.x as u16 + area.width;
         if too_far_right {
-            // If the current offset is greater than the length of the current line
-            // we need to adjust the offset so that the cursor is visible
-            self.offset.x = cursor_x - area.width as usize + 1;
+            self.offset.x = cursor_x
+                .saturating_sub(area.width as usize)
+                .saturating_add(1);
         }
 
-        // If we're going out of sight from to the left, clamp the offset
-        // with the cursor's position
+        // Ensure offset.x is never greater than cursor_x
         self.offset.x = min(self.offset.x, cursor_x);
     }
 
     /// Updates the y offset of the buffer so that the cursor is always visible
-    fn update_y_offset(&mut self, area: Rect) {
-        let cursor_y = self
-            .cursor_position
-            .unwrap_or(&BufferPosition { line: 0, offset: 0 })
-            .line;
+    fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
+        let cursor_y = self.cursor_position.as_ref().map_or(0, |pos| pos.line);
 
         let too_far_down = cursor_y as u16 >= self.offset.y as u16 + area.height;
         if too_far_down {
-            // If the current y coordinate of the cursor is below the visible area,
-            // the buffer has to be shifted down so that the cursor is visible
-            self.offset.y = cursor_y - area.height as usize + 1;
+            self.offset.y = cursor_y
+                .saturating_sub(area.height as usize)
+                .saturating_add(1);
         }
 
-        // If we're going out of sight from the top, clamp the offset
-        // with the cursor's position
+        // Ensure offset.y is never greater than cursor_y
         self.offset.y = min(self.offset.y, cursor_y);
     }
 
     /// Shifts the content of the buffer down by the offset and returns the resulting string.
     /// Basically removes the first self.offset.y lines and joins the remanining ones.
-    fn shift_contents_down(self, contents: String) -> String {
+    fn shift_contents_down(&mut self, contents: String) -> String {
         contents
             .lines()
             .skip(self.offset.y)
@@ -142,17 +136,63 @@ impl BufferDisplay<'_> {
             .collect::<Vec<String>>()
             .join("\n")
     }
+
+    fn shift_contents(&mut self, contents: String) -> String {
+        let down_shifted = self.shift_contents_down(contents);
+        self.shift_contents_right(down_shifted)
+    }
+
+    /// Calculates the render position of the cursor in the given rect.
+    pub fn calculate_cursor_render_position(
+        &self,
+        area: ratatui::layout::Rect,
+    ) -> TerminalPosition {
+        use std::cmp::min;
+
+        let (max_x, max_y) = (area.width.saturating_sub(1), area.height.saturating_sub(1));
+        let (base_x, base_y) = (area.x, area.y);
+
+        let cursor_position = self
+            .cursor_position
+            .as_ref()
+            .unwrap_or(&BufferPosition { line: 0, offset: 0 });
+
+        TerminalPosition {
+            x: min(
+                (base_x + cursor_position.offset as u16).saturating_sub(self.offset.x as u16),
+                max_x,
+            ),
+            y: min(
+                (base_y + cursor_position.line as u16).saturating_sub(self.offset.y as u16),
+                max_y,
+            ),
+        }
+    }
 }
 
-impl Widget for BufferDisplay<'_> {
-    fn render(mut self, area: Rect, buf: &mut Buffer) {
-        self.update_x_offset(area);
-        self.update_y_offset(area);
-        let contents_shifted_right = self.shift_contents_right(self.buffer_contents.to_string());
-        let contents_shifted_down = self.shift_contents_down(contents_shifted_right);
+/// Widget for displaying the buffer contents.
+pub struct BufferDisplayWidget;
 
-        let text_widget = Text::from(contents_shifted_down);
+impl StatefulWidget for BufferDisplayWidget {
+    /// State of the buffer display
+    type State = BufferDisplayState;
+
+    fn render(
+        self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        state: &mut Self::State,
+    ) {
+        // Update offsets to keep cursor visible
+        state.update_x_offset(area);
+        state.update_y_offset(area);
+
+        // Shift contents based on offset
+        let shifted_contents = state.shift_contents(state.buffer_contents.clone());
+        // Render the text using Paragraph
+        let text_widget = Text::from(shifted_contents);
         let paragraph_widget = Paragraph::new(text_widget);
+
         paragraph_widget.render(area, buf);
     }
 }

@@ -4,9 +4,9 @@ use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Position as TerminalPosition, Rect},
-    prelude::Backend,
+    prelude::{Backend, StatefulWidget},
     text::Text,
-    widgets::{Block, Borders, Paragraph, StatefulWidget, Widget, Wrap},
+    widgets::{Block, Borders, Paragraph, Widget, Wrap},
     Terminal,
 };
 use std::cmp::min;
@@ -14,7 +14,7 @@ use std::cmp::min;
 use crate::{
     operations::Operation,
     pike::Pike,
-    ui::{BufferDisplay, FileInput, UIState},
+    ui::{BufferDisplayWidget, FileInput, UIState},
 };
 
 /// TUI application which displays the UI and handles events
@@ -50,10 +50,14 @@ impl App {
     }
 
     fn new(backend: Pike) -> App {
+        let buffer_contents = backend.current_buffer_contents();
+        let cursor_position = backend.cursor_position();
+        let ui_state = UIState::new(buffer_contents, cursor_position);
+
         App {
             exit: false,
             backend,
-            ui_state: UIState::default(),
+            ui_state,
         }
     }
 
@@ -103,11 +107,18 @@ impl App {
 
     /// Render the contents of the currently opened buffer in a given Rect
     fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
-        let buffer_contents = &self.backend.current_buffer_contents();
-        let cursor_position = self.backend.cursor_position();
-        let offset = &mut self.ui_state.buffer_offset;
-        let buffer_widget = BufferDisplay::new(buffer_contents, cursor_position.as_ref(), offset);
-        buffer_widget.render(area, buf);
+        self.sync_buffer_state_with_ui_state();
+
+        let widget = BufferDisplayWidget;
+        widget.render(area, buf, &mut self.ui_state.buffer_state);
+    }
+
+    /// Sync the buffer state with the UI state so that the UI receives the fresh cursor position
+    /// and buffer contents
+    /// TODO: make them references pointing to the correct backend vars instead
+    fn sync_buffer_state_with_ui_state(&mut self) {
+        self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
+        self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
     }
 
     /// Render the status bar in a given Rect
@@ -197,7 +208,7 @@ impl App {
         let (base_x, base_y) = Self::base_rect_position(&area);
 
         let buffer_cursor_position = buffer.cursor.position;
-        let offset = &self.ui_state.buffer_offset;
+        let offset = &self.ui_state.buffer_state.offset;
 
         TerminalPosition {
             x: min(
@@ -551,6 +562,23 @@ mod tests {
         assert_eq!(buf, expected)
     }
 
+    #[allow(dead_code)]
+    /// Helper function to assert the position to render the cursor at in the visible
+    /// buffer after syncing the buffer contents and cursor position from the backend.
+    fn assert_cursor_render_pos_no_input(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
+        // 1) Sync the in-memory state with the backend’s latest data
+        app.ui_state.buffer_state.buffer_contents = app.backend.current_buffer_contents();
+        app.ui_state.buffer_state.cursor_position = app.backend.cursor_position();
+
+        // 2) Compute the cursor position from the state
+        let pos = app
+            .ui_state
+            .buffer_state
+            .calculate_cursor_render_position(buf.area);
+
+        // 3) Verify
+        assert_eq!(pos, expected.into());
+    }
     /// The cursor should not move past the bounds of the buffer
     #[test]
     fn test_cant_move_cursor_too_far_right() {
