@@ -138,9 +138,9 @@ impl App {
     /// Render the status bar in a given Rect
     fn render_status_bar(&self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         let filename = self.backend.current_buffer_filename();
-        let is_saved = self.backend.is_current_buffer_saved();
+        let is_modified = self.backend.is_current_buffer_modified();
 
-        let indicator = if is_saved { "" } else { "*" };
+        let indicator = if is_modified { "*" } else { "" };
         let text_widget = Text::from(format!("{}{}", filename, indicator));
 
         let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });

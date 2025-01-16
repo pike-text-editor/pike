@@ -8,13 +8,11 @@ use crate::operations::Operation;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 
-use std::collections::HashMap;
 /// Backend of the app
 #[allow(dead_code, unused_variables, unused_mut)]
 pub struct Pike {
     workspace: Workspace,
     config: Config,
-    saved_state: HashMap<PathBuf, bool>,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -48,7 +46,6 @@ impl Pike {
             workspace,
             config: Config::from_file(config_file.as_deref())
                 .map_err(|e| format!("Error loading config: {}", e))?,
-            saved_state: HashMap::new(),
         })
     }
 
@@ -97,9 +94,6 @@ impl Pike {
             Some(buffer) => {
                 buffer.insert(text);
 
-                if let Some(path) = self.current_buffer_path() {
-                    self.saved_state.insert(path, false);
-                }
                 Ok(())
             }
             None => Err("Trying to write to a non-existent buffer".to_string()),
@@ -134,12 +128,6 @@ impl Pike {
             } else if pos.offset > 0 {
                 buffer.cursor.move_left();
                 buffer.delete();
-            }
-            // Mark as changed when succesfull
-            if pos.offset != 0 {
-                if let Some(path) = self.current_buffer_path() {
-                    self.saved_state.insert(path, false);
-                }
             }
         }
     }
@@ -266,22 +254,16 @@ impl Pike {
             Some(buffer) => {
                 buffer.save().expect("Failed to save buffer");
 
-                // Mark as saved (true) if there's a path
-                if let Some(path) = self.current_buffer_path() {
-                    self.saved_state.insert(path, true);
-                }
-
                 Ok(())
             }
             None => Err("Trying to save a non-existent buffer".to_string()),
         }
     }
 
-    pub fn is_current_buffer_saved(&self) -> bool {
-        if let Some(path) = self.current_buffer_path() {
-            self.saved_state.get(&path).copied().unwrap_or(true)
-        } else {
-            false
+    pub fn is_current_buffer_modified(&self) -> bool {
+        match self.current_buffer() {
+            Some(buffer) => buffer.modified(),
+            None => false,
         }
     }
 
