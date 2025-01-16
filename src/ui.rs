@@ -75,7 +75,11 @@ impl UIState {
     }
 
     /// Calculate position for buffer
-    pub fn calculate_cursor_for_buffer(&self, area: Rect, cursor_pos: Option<BufferPosition>) -> TerminalPosition {
+    pub fn calculate_cursor_for_buffer(
+        &self,
+        area: Rect,
+        cursor_pos: Option<BufferPosition>,
+    ) -> TerminalPosition {
         // If we have a cursor position, compute accordingly;
         // otherwise return a default
         if let Some(cursor_pos) = cursor_pos {
@@ -137,12 +141,8 @@ pub struct BufferDisplayState {
 
 #[allow(dead_code)]
 impl BufferDisplayState {
-    pub fn new(
-        offset: BufferDisplayOffset,
-    ) -> Self {
-        BufferDisplayState {
-            offset,
-        }
+    pub fn new(offset: BufferDisplayOffset) -> Self {
+        BufferDisplayState { offset }
     }
     /// Updates the x offset of the buffer so that the cursor is always visible
     pub fn update_x_offset(&mut self, area: Rect, cursor_offset_x: usize) {
@@ -209,10 +209,7 @@ pub struct BufferDisplayWidget<'a> {
 }
 
 impl<'a> BufferDisplayWidget<'a> {
-    pub fn new(
-        buffer_contents: &'a str,
-        cursor_position: Option<BufferPosition>,
-    ) -> Self {
+    pub fn new(buffer_contents: &'a str, cursor_position: Option<BufferPosition>) -> Self {
         Self {
             buffer_contents,
             cursor_position,
@@ -220,7 +217,7 @@ impl<'a> BufferDisplayWidget<'a> {
     }
 }
 
-impl<'a> StatefulWidget for BufferDisplayWidget<'a> {
+impl StatefulWidget for BufferDisplayWidget<'_> {
     /// For this example, we won't store extra "widget state"
     /// outside of what's already in `BufferDisplay`, so we use `()`.
     type State = BufferDisplayState;
