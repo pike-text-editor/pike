@@ -218,8 +218,6 @@ impl<'a> BufferDisplayWidget<'a> {
 }
 
 impl StatefulWidget for BufferDisplayWidget<'_> {
-    /// For this example, we won't store extra "widget state"
-    /// outside of what's already in `BufferDisplay`, so we use `()`.
     type State = BufferDisplayState;
 
     fn render(
