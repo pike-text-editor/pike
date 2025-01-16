@@ -225,8 +225,6 @@ impl<'a> StatefulWidget for BufferDisplayWidget<'a> {
     /// outside of what's already in `BufferDisplay`, so we use `()`.
     type State = BufferDisplayState;
 
-    /// Render the widget. Notice that `render` here includes a `state` parameter
-    /// which you can use if you need separate "runtime" state.
     fn render(
         self,
         area: ratatui::prelude::Rect,
@@ -244,7 +242,6 @@ impl<'a> StatefulWidget for BufferDisplayWidget<'a> {
         let text_widget = Text::from(shifted_contents);
         let paragraph_widget = Paragraph::new(text_widget);
 
-        // We need the Widget trait to be in scope for .render(...) to work
         paragraph_widget.render(area, buf);
     }
 }
