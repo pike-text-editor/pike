@@ -52,10 +52,8 @@ impl App {
     }
 
     fn new(backend: Pike) -> App {
-        let buffer_contents = backend.current_buffer_contents();
-        let cursor_position = backend.cursor_position();
         let offset = BufferDisplayOffset::default();
-        let buffer_state = BufferDisplayState::new(buffer_contents, cursor_position, offset);
+        let buffer_state = BufferDisplayState::new(offset);
         let file_input = None;
         let ui_state = UIState {
             buffer_state,
@@ -86,6 +84,8 @@ impl App {
         let main_area = layout[0];
         let status_bar_area = layout[1];
 
+        let cursor_pos = self.backend.cursor_position();
+
         let mut render_cursor_position;
 
         self.render_buffer_contents(main_area, frame.buffer_mut());
@@ -96,11 +96,11 @@ impl App {
             self.render_file_input(status_bar_area, frame.buffer_mut());
             render_cursor_position = self
                 .ui_state
-                .calculate_cursor_position(CursorCalculationMode::FileInput(input), &layout);
+                .calculate_cursor_position(CursorCalculationMode::FileInput(input), &layout, cursor_pos);
         } else {
             render_cursor_position = self
                 .ui_state
-                .calculate_cursor_position(CursorCalculationMode::Buffer, &layout);
+                .calculate_cursor_position(CursorCalculationMode::Buffer, &layout, cursor_pos);
             self.render_status_bar(status_bar_area, frame.buffer_mut());
         }
 
@@ -124,12 +124,10 @@ impl App {
 
     /// Render the contents of the currently opened buffer in a given Rect
     fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
-        // 1) Sync the in-memory state with the backend’s latest data
-        self.ui_state.buffer_state.buffer_contents = self.backend.current_buffer_contents();
-        self.ui_state.buffer_state.cursor_position = self.backend.cursor_position();
+        let contents = self.backend.current_buffer_contents();
+        let cursor = self.backend.cursor_position();
 
-        // 2) Render using our new StatefulWidget
-        let widget = BufferDisplayWidget;
+        let widget = BufferDisplayWidget::new(&contents, cursor);
         widget.render(area, buf, &mut self.ui_state.buffer_state);
     } 
 
@@ -446,22 +444,36 @@ mod tests {
         expected: (u16, u16),
     ) {
         let pos = match renderer {
-            CursorRenderingWidget::CurrentBuffer =>
-            // Use your new UIState method with CursorCalculationMode::Buffer
-            {
-                app.ui_state.calculate_cursor_for_buffer(buf.area)
+            CursorRenderingWidget::CurrentBuffer => {
+                let cursor_position = app.backend.cursor_position();
+    
+
+                if let Some(cp) = cursor_position {
+                    // Scroll horizontally
+                    app.ui_state
+                        .buffer_state
+                        .update_x_offset(buf.area, cp.offset);
+                    // Scroll vertically
+                    app.ui_state
+                        .buffer_state
+                        .update_y_offset(buf.area, cp.line);
+                }
+    
+                // 3) Ask UIState where the cursor _should_ be rendered:
+                app.ui_state.calculate_cursor_for_buffer(buf.area, cursor_position)
             }
+    
             CursorRenderingWidget::FileInput => {
+                // If we’re testing file input, just call the file-input cursor function.
                 let input = app
                     .ui_state
                     .file_input
                     .as_ref()
                     .expect("A file input should be open when testing cursor in file input");
-                app.ui_state
-                    .calculate_cursor_for_file_input(input, buf.area)
+                app.ui_state.calculate_cursor_for_file_input(input, buf.area)
             }
         };
-
+    
         assert_eq!(pos, expected.into());
     }
 
@@ -541,17 +553,23 @@ mod tests {
     /// Helper function to   assert the position to render the cursor at in the visible
     /// buffer after syncing the buffer contents and cursor position from the backend.
     fn assert_cursor_render_pos_no_input(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
-        // 1) Sync the in-memory state with the backend’s latest data
-        app.ui_state.buffer_state.buffer_contents = app.backend.current_buffer_contents();
-        app.ui_state.buffer_state.cursor_position = app.backend.cursor_position();
 
-        // 2) Compute the cursor position from the state
+        let cursor_position = app.backend.cursor_position();
+    
+
+        if let Some(cp) = cursor_position {
+            app.ui_state
+                .buffer_state
+                .update_x_offset(buf.area, cp.offset);
+            app.ui_state
+                .buffer_state
+                .update_y_offset(buf.area, cp.line);
+        }
+    
         let pos = app
             .ui_state
-            .buffer_state
-            .calculate_cursor_render_position(buf.area);
+            .calculate_cursor_for_buffer(buf.area, cursor_position);
 
-        // 3) Verify
         assert_eq!(pos, expected.into());
     }
     /// The cursor should not move past the bounds of the buffer

@@ -40,6 +40,7 @@ impl UIState {
         &self,
         calc_mode: CursorCalculationMode,
         layout: &Rc<[Rect]>,
+        cursor_pos: Option<BufferPosition>,
     ) -> TerminalPosition {
         let main_area = 1;
         let status_bar_area = 0;
@@ -49,7 +50,7 @@ impl UIState {
                 self.calculate_cursor_for_file_input(input, layout[main_area])
             }
             CursorCalculationMode::Buffer => {
-                self.calculate_cursor_for_buffer(layout[status_bar_area])
+                self.calculate_cursor_for_buffer(layout[status_bar_area], cursor_pos)
             }
         }
     }
@@ -74,10 +75,10 @@ impl UIState {
     }
 
     /// Calculate position for buffer
-    pub fn calculate_cursor_for_buffer(&self, area: Rect) -> TerminalPosition {
+    pub fn calculate_cursor_for_buffer(&self, area: Rect, cursor_pos: Option<BufferPosition>) -> TerminalPosition {
         // If we have a cursor position, compute accordingly;
         // otherwise return a default
-        if let Some(cursor_pos) = &self.buffer_state.cursor_position {
+        if let Some(cursor_pos) = cursor_pos {
             let (max_x, max_y) = Self::max_rect_position(&area);
             let (base_x, base_y) = Self::base_rect_position(&area);
 
@@ -131,52 +132,41 @@ impl BufferDisplayOffset {
 #[derive(Default)]
 /// Represents the state of a buffer display, including its contents, cursor position, and offset.
 pub struct BufferDisplayState {
-    pub buffer_contents: String,
-    pub cursor_position: Option<BufferPosition>,
     pub offset: BufferDisplayOffset,
 }
 
 #[allow(dead_code)]
 impl BufferDisplayState {
     pub fn new(
-        buffer_contents: String,
-        cursor_position: Option<BufferPosition>,
         offset: BufferDisplayOffset,
     ) -> Self {
         BufferDisplayState {
-            buffer_contents,
-            cursor_position,
             offset,
         }
     }
     /// Updates the x offset of the buffer so that the cursor is always visible
-    fn update_x_offset(&mut self, area: ratatui::prelude::Rect) {
-        let cursor_x = self.cursor_position.as_ref().map_or(0, |pos| pos.offset);
-
-        let too_far_right = cursor_x as u16 >= self.offset.x as u16 + area.width;
+    pub fn update_x_offset(&mut self, area: Rect, cursor_offset_x: usize) {
+        let too_far_right = cursor_offset_x as u16 >= self.offset.x as u16 + area.width;
         if too_far_right {
-            self.offset.x = cursor_x
+            self.offset.x = cursor_offset_x
                 .saturating_sub(area.width as usize)
                 .saturating_add(1);
         }
 
         // Ensure offset.x is never greater than cursor_x
-        self.offset.x = min(self.offset.x, cursor_x);
+        self.offset.x = self.offset.x.min(cursor_offset_x);
     }
 
-    /// Updates the y offset of the buffer so that the cursor is always visible
-    fn update_y_offset(&mut self, area: ratatui::prelude::Rect) {
-        let cursor_y = self.cursor_position.as_ref().map_or(0, |pos| pos.line);
-
-        let too_far_down = cursor_y as u16 >= self.offset.y as u16 + area.height;
+    pub fn update_y_offset(&mut self, area: Rect, cursor_line: usize) {
+        let too_far_down = cursor_line as u16 >= self.offset.y as u16 + area.height;
         if too_far_down {
-            self.offset.y = cursor_y
+            self.offset.y = cursor_line
                 .saturating_sub(area.height as usize)
                 .saturating_add(1);
         }
 
         // Ensure offset.y is never greater than cursor_y
-        self.offset.y = min(self.offset.y, cursor_y);
+        self.offset.y = self.offset.y.min(cursor_line);
     }
 
     /// Shifts the content of the buffer down by the offset and returns the resulting string.
@@ -207,42 +197,30 @@ impl BufferDisplayState {
         let down_shifted = self.shift_contents_down(contents);
         self.shift_contents_right(down_shifted)
     }
-
-    /// Calculates the render position of the cursor in the given rect.
-    pub fn calculate_cursor_render_position(
-        &self,
-        area: ratatui::layout::Rect,
-    ) -> TerminalPosition {
-        use std::cmp::min;
-
-        let (max_x, max_y) = (area.width.saturating_sub(1), area.height.saturating_sub(1));
-        let (base_x, base_y) = (area.x, area.y);
-
-        let cursor_position = self
-            .cursor_position
-            .as_ref()
-            .unwrap_or(&BufferPosition { line: 0, offset: 0 });
-
-        TerminalPosition {
-            x: min(
-                (base_x + cursor_position.offset as u16).saturating_sub(self.offset.x as u16),
-                max_x,
-            ),
-            y: min(
-                (base_y + cursor_position.line as u16).saturating_sub(self.offset.y as u16),
-                max_y,
-            ),
-        }
-    }
 }
 
 /// Widget for displaying the buffer contents. Serves as a thin wrapper
 /// to lift the responsibility of actually rendering the contents from the
 /// app itself, so it does not copy the data, but itself receives references
 /// as it's created on every app render.
-pub struct BufferDisplayWidget;
+pub struct BufferDisplayWidget<'a> {
+    pub buffer_contents: &'a str,
+    pub cursor_position: Option<BufferPosition>,
+}
 
-impl StatefulWidget for BufferDisplayWidget {
+impl<'a> BufferDisplayWidget<'a> {
+    pub fn new(
+        buffer_contents: &'a str,
+        cursor_position: Option<BufferPosition>,
+    ) -> Self {
+        Self {
+            buffer_contents,
+            cursor_position,
+        }
+    }
+}
+
+impl<'a> StatefulWidget for BufferDisplayWidget<'a> {
     /// For this example, we won't store extra "widget state"
     /// outside of what's already in `BufferDisplay`, so we use `()`.
     type State = BufferDisplayState;
@@ -256,11 +234,12 @@ impl StatefulWidget for BufferDisplayWidget {
         state: &mut Self::State,
     ) {
         // Update offsets to keep cursor visible
-        state.update_x_offset(area);
-        state.update_y_offset(area);
-
+        if let Some(pos) = self.cursor_position {
+            state.update_x_offset(area, pos.offset);
+            state.update_y_offset(area, pos.line);
+        }
         // Shift contents based on offset
-        let shifted_contents = state.shift_contents(state.buffer_contents.clone());
+        let shifted_contents = state.shift_contents(self.buffer_contents.to_string());
         // Render the text using Paragraph
         let text_widget = Text::from(shifted_contents);
         let paragraph_widget = Paragraph::new(text_widget);
