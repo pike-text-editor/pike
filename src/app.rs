@@ -215,7 +215,7 @@ impl App {
         // No input means the event can't be handled
         let input = match self.ui_state.file_input.as_mut() {
             Some(input) => input,
-            None => return Ok(false),
+            None => return false,
         };
 
         // Perform the corresponding operation and close the input
@@ -289,16 +289,26 @@ impl App {
         }
 
         if self.try_handle_input_key(key) {
-            return Ok(());
+            if !key.modifiers.contains(KeyModifiers::CONTROL) {
+                return Ok(());
+            }
         }
 
         match key.code {
             KeyCode::Left => {
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    self.backend.move_cursor_left_by_word();
+                } else {
                 self.backend.move_cursor_left();
+                }
                 Ok(())
             }
             KeyCode::Right => {
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    self.backend.move_cursor_right_by_word();
+                } else {
                 self.backend.move_cursor_right();
+                }
                 Ok(())
             }
             KeyCode::Up => {
@@ -309,6 +319,15 @@ impl App {
                 self.backend.move_cursor_down();
                 Ok(())
             }
+            KeyCode::End => {
+                self.backend.move_cursor_to_end_of_line();
+                Ok(())
+            }
+            KeyCode::Home => {
+                self.backend.move_cursor_to_start_of_line();
+                Ok(())
+            }
+
             _ => Ok(()),
         }
     }
