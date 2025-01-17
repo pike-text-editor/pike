@@ -323,12 +323,10 @@ impl App {
     fn try_handle_input_key(&mut self, key: KeyEvent) -> bool {
         // TODO: Better error handling
         if let KeyCode::Char(ch) = key.code {
-            if ch.is_alphanumeric() || ch == ' ' {
-                let _ = self.backend.write_to_current_buffer(&ch.to_string());
-                self.backend.move_cursor_right();
+            let _ = self.backend.write_to_current_buffer(&ch.to_string());
+            self.backend.move_cursor_right();
 
-                return true;
-            }
+            return true;
         }
         match key.code {
             KeyCode::Enter => {
