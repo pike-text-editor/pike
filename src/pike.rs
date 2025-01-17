@@ -8,11 +8,28 @@ use crate::operations::Operation;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 
+/// Cursor history
+#[derive(Default)]
+struct CursorHistory {
+    undo_stack: Vec<BufferPosition>,
+    redo_stack: Vec<BufferPosition>,
+}
+
+impl CursorHistory {
+    /// Record a new cursor position on the undo stack.
+    fn record_undo_position(&mut self, pos: BufferPosition) {
+        self.undo_stack.push(pos);
+        // Once you record a new position, clear the redo stack.
+        self.redo_stack.clear();
+    }
+}
+
 /// Backend of the app
 #[allow(dead_code, unused_variables, unused_mut)]
 pub struct Pike {
     workspace: Workspace,
     config: Config,
+    cursor_history: CursorHistory,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -50,6 +67,7 @@ impl Pike {
             workspace,
             config: Config::from_file(config_file.as_deref())
                 .map_err(|e| format!("Error loading config: {}", e))?,
+            cursor_history: CursorHistory::default(),
         })
     }
 
@@ -357,11 +375,15 @@ impl Pike {
     /// Switch to the previous buffer
     pub fn previous_buffer(&mut self) {
         self.workspace.previous_buffer();
+        // Clear the cursor history when switching buffers
+        self.cursor_history = CursorHistory::default();
     }
 
     /// Switch to the next buffer
     pub fn next_buffer(&mut self) {
         self.workspace.next_buffer();
+        // Clear the cursor history when switching buffers
+        self.cursor_history = CursorHistory::default();
     }
 
     /// Search for a query in the current buffer and return
