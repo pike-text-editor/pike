@@ -121,6 +121,27 @@ impl Pike {
 
                 buffer.insert(text);
 
+                // Calculate how many lines the inserted text spans
+                let lines: Vec<&str> = text.split('\n').collect();
+                let line_count = lines.len() - 1;
+
+                // On the final line, check where it ends
+                let last_line_len = lines.last().map_or(0, |l| l.chars().count());
+
+                // If no newlines were inserted, just advance on the same line
+                // Otherwise, move down line_count lines, then set offset to the length of the last line
+                let new_line = start_position.line + line_count;
+                let new_offset = if line_count == 0 {
+                    start_position.offset + last_line_len
+                } else {
+                    last_line_len
+                };
+
+                buffer.cursor.move_to(scribe::buffer::Position {
+                    line: new_line,
+                    offset: new_offset,
+                });
+
                 Ok(())
             }
             None => Err("Trying to write to a non-existent buffer".to_string()),
