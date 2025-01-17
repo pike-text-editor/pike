@@ -211,7 +211,7 @@ impl App {
 
     /// Try to handle the key press using a file input. Returns a boolean
     /// indicating whether the event has been handled or not.
-    fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
+    fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> bool {
         // No input means the event can't be handled
         let input = match self.ui_state.file_input.as_mut() {
             Some(input) => input,
@@ -223,29 +223,32 @@ impl App {
             let path = input.to_path();
             match input.role {
                 FileInputRole::GetOpenPath => self.open_file_from_path(path),
-                FileInputRole::GetSavePath => self.backend.bind_current_buffer_to_path(path),
+                FileInputRole::GetSavePath => {
+                    self.backend.bind_current_buffer_to_path(path);
+                    self.handle_save_operation();
+                }
             }
             self.backend.save_current_buffer().map_err(|e| {
                 io::Error::new(io::ErrorKind::Other, format!("Error saving buffer: {}", e))
             })?;
 
             self.close_file_input();
-            return Ok(true);
+            return true;
         }
 
         // Close the input
         if (key.code, key.modifiers) == (KeyCode::Esc, KeyModifiers::NONE) {
             self.close_file_input();
-            return Ok(true);
+            return true;
         }
 
         // Try to create a request to the file input and handle it
         match Self::key_event_to_input_request(key) {
             Some(request) => {
                 input.handle(request);
-                Ok(true)
+                true
             }
-            None => Ok(false),
+            None => false,
         }
     }
 
@@ -277,7 +280,7 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
-        if self.try_handle_key_press_with_file_input(key)? {
+        if self.try_handle_key_press_with_file_input(key) {
             return Ok(());
         }
 
