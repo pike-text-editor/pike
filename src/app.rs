@@ -396,8 +396,8 @@ impl App {
                 todo!("Handle SearchAndReplaceInCurrentBuffer operation")
             }
 
-            Operation::Undo => todo!("Handle Undo operation"),
-            Operation::Redo => todo!("Handle Redo operation"),
+            Operation::Undo => self.backend.undo(),
+            Operation::Redo => self.backend.redo(),
 
             // WARN: these probably won't be supported
             Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
