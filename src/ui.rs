@@ -5,9 +5,9 @@ use ratatui::{
     widgets::{self, Paragraph, StatefulWidget, Widget},
 };
 use scribe::buffer::Position as BufferPosition;
-use std::cmp::min;
 use std::rc::Rc;
-use tui_input::Input;
+use std::{cmp::min, path::PathBuf};
+use tui_input::{Input, InputRequest};
 
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
@@ -24,6 +24,40 @@ pub enum CursorCalculationMode<'a> {
     Buffer,
 }
 
+/// Two ways a file input can serve in the app - either when opening
+/// a new file by path or saving an unbound buffer
+#[derive(Debug, Clone, PartialEq)]
+pub enum FileInputRole {
+    GetOpenPath,
+    GetSavePath,
+}
+
+/// Holds an input and an indicator of its role
+#[derive(Clone)]
+pub struct FileInputState {
+    pub input: Input,
+    pub role: FileInputRole,
+}
+
+impl FileInputState {
+    pub fn to_path(&self) -> PathBuf {
+        PathBuf::from(self.input.to_string())
+    }
+
+    pub fn handle(&mut self, req: InputRequest) {
+        self.input.handle(req);
+    }
+}
+
+impl From<(&str, FileInputRole)> for FileInputState {
+    fn from((input, role): (&str, FileInputRole)) -> Self {
+        FileInputState {
+            input: input.into(),
+            role,
+        }
+    }
+}
+
 /// Holds the information about the current state of the UI
 /// of the app.
 #[allow(dead_code)]
@@ -31,7 +65,9 @@ pub enum CursorCalculationMode<'a> {
 pub struct UIState {
     /// Offset of the currently rendered buffer
     pub buffer_state: BufferDisplayState,
-    pub file_input: Option<Input>,
+    /// A text input used to enter the filepath when saving an unbound buffer
+    /// and opening a new file
+    pub file_input: Option<FileInputState>,
 }
 
 impl UIState {
@@ -248,10 +284,10 @@ impl StatefulWidget for BufferDisplayWidget<'_> {
 pub struct FileInput {}
 
 impl StatefulWidget for FileInput {
-    type State = tui_input::Input;
+    type State = FileInputState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let widget = widgets::Paragraph::new(state.to_text()).block(
+        let widget = widgets::Paragraph::new(state.input.to_text()).block(
             widgets::Block::new()
                 .borders(widgets::Borders::all())
                 .title("Enter relative file path"),
@@ -263,20 +299,23 @@ impl StatefulWidget for FileInput {
 #[cfg(test)]
 mod tests {
     use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
-    use tui_input::{Input, InputRequest};
+    use tui_input::InputRequest;
 
-    use crate::test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border};
+    use crate::{
+        test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border},
+        ui::{FileInputRole, FileInputState},
+    };
 
     use super::FileInput;
     // TODO: could move some BufferDisplay tests here for clarity
 
     #[test]
     fn file_input_displays_input() {
-        let mut input: Input = "hello".into();
+        let mut input_state: FileInputState = ("hello", FileInputRole::GetSavePath).into();
         let mut buf = Buffer::empty(Rect::new(0, 0, 10, 3));
 
         let widget = FileInput::default();
-        widget.render(buf.area, &mut buf, &mut input);
+        widget.render(buf.area, &mut buf, &mut input_state);
 
         // Skip the borders, we're not testing the library
         let text_line = nth_line_from_terminal_buffer(&buf, 1);
@@ -288,10 +327,10 @@ mod tests {
 
         // Insert an additional character
         let request = InputRequest::InsertChar(',');
-        input.handle(request);
+        input_state.handle(request);
 
         let widget = FileInput::default();
-        widget.render(buf.area, &mut buf, &mut input);
+        widget.render(buf.area, &mut buf, &mut input_state);
         let text_line = nth_line_from_terminal_buffer(&buf, 1);
 
         assert_eq!(
