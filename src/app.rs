@@ -228,9 +228,6 @@ impl App {
                     self.handle_save_operation();
                 }
             }
-            self.backend.save_current_buffer().map_err(|e| {
-                io::Error::new(io::ErrorKind::Other, format!("Error saving buffer: {}", e))
-            })?;
 
             self.close_file_input();
             return true;
