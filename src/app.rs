@@ -296,7 +296,7 @@ impl App {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     self.backend.move_cursor_left_by_word();
                 } else {
-                self.backend.move_cursor_left();
+                    self.backend.move_cursor_left();
                 }
                 Ok(())
             }
@@ -304,7 +304,7 @@ impl App {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     self.backend.move_cursor_right_by_word();
                 } else {
-                self.backend.move_cursor_right();
+                    self.backend.move_cursor_right();
                 }
                 Ok(())
             }
