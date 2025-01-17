@@ -453,14 +453,39 @@ impl Pike {
         }
     }
 
-    /// Undo the last change in the current buffer
-    fn undo(&mut self) {
-        todo!()
+    /// Undo the last change in the current buffer and adjust the cursor position
+    pub fn undo(&mut self) {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            // If there's a recorded position, pop it off
+            if let Some(prev_pos) = self.cursor_history.undo_stack.pop() {
+                // Push the current cursor position onto redo stack.
+                let current_pos = buf.cursor.position;
+                self.cursor_history.redo_stack.push(current_pos);
+
+                buf.undo();
+
+                // Move cursor to the old position
+                buf.cursor.move_to(prev_pos);
+            }
+        }
     }
 
-    /// Redo the last change in the current buffer
-    fn redo(&mut self) {
-        todo!()
+    /// Redo the last change in the current buffer and adjust the cursor position
+    pub fn redo(&mut self) {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            // If there's a position we previously popped off, pop it from redo
+            if let Some(pos) = self.cursor_history.redo_stack.pop() {
+                // Push the current cursor position onto undo stack
+                // so we can jump back if we undo the redo.
+                let current_pos = buf.cursor.position;
+                self.cursor_history.undo_stack.push(current_pos);
+
+                buf.redo();
+
+                // Move the cursor to the position after redo
+                buf.cursor.move_to(pos);
+            }
+        }
     }
 
     /// Returns the current working directory as a pathbuf
