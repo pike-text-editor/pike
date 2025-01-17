@@ -362,14 +362,12 @@ impl App {
         // TODO: Better error handling
         if let KeyCode::Char(ch) = key.code {
             let _ = self.backend.write_to_current_buffer(&ch.to_string());
-            self.backend.move_cursor_right();
 
             return true;
         }
         match key.code {
             KeyCode::Enter => {
                 let _ = self.backend.write_to_current_buffer("\n");
-                self.backend.move_cursor_down();
                 true
             }
             KeyCode::Backspace => {
