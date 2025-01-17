@@ -285,10 +285,8 @@ impl App {
             return Ok(());
         }
 
-        if self.try_handle_input_key(key) {
-            if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                return Ok(());
-            }
+        if self.try_handle_input_key(key) && !key.modifiers.contains(KeyModifiers::CONTROL) {
+            return Ok(());
         }
 
         match key.code {
