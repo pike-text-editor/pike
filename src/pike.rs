@@ -681,6 +681,9 @@ mod pike_test {
         let result = pike.write_to_current_buffer("Hello, world!");
         assert!(result.is_ok());
         assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+        pike.write_to_current_buffer(" Its me!")
+            .expect("Failed to write to buffer");
+        assert_eq!(pike.current_buffer_contents(), "Hello, world! Its me!");
     }
 
     #[test]
@@ -826,6 +829,36 @@ mod pike_test {
     }
 
     #[test]
+    fn test_move_cursor_left_by_word() {
+        let contents = "aaa aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 4 });
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_right_by_word() {
+        let contents = "aaa aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 0 });
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 3 })
+        );
+    }
+
+    #[test]
     fn test_current_line_length_buffer_exists() {
         let contents = ["Hello!", ""].join("\n");
         let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents.as_str()));
@@ -928,5 +961,110 @@ mod pike_test {
         let contents_from_file =
             fs::read_to_string(file_path).expect("std::fs failed to read from file");
         assert_eq!(file_contents, contents_from_file)
+    }
+
+    #[test]
+    fn test_moving_cursor_when_inserting_many_characters() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        pike.move_cursor_to(Position {
+            line: 0,
+            offset: 13,
+        });
+        pike.write_to_current_buffer(" Its me!")
+            .expect("Failed to write to buffer");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world! Its me!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 21
+            })
+        );
+    }
+
+    #[test]
+    fn test_undo() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        pike.move_cursor_to(Position {
+            line: 0,
+            offset: 13,
+        });
+        pike.write_to_current_buffer("!")
+            .expect("Failed to write to buffer");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 14
+            })
+        );
+
+        pike.undo();
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 13
+            })
+        );
+    }
+
+    #[test]
+    fn test_redo() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        pike.move_cursor_to(Position {
+            line: 0,
+            offset: 13,
+        });
+        pike.write_to_current_buffer("!")
+            .expect("Failed to write to buffer");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 14
+            })
+        );
+
+        pike.undo();
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 13
+            })
+        );
+
+        pike.redo();
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 14
+            })
+        );
     }
 }
