@@ -114,6 +114,11 @@ impl Pike {
     pub fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
+                // Remember the cursor position before inserting
+                let start_position = buffer.cursor.position;
+
+                self.cursor_history.record_undo_position(start_position);
+
                 buffer.insert(text);
 
                 Ok(())
@@ -126,6 +131,9 @@ impl Pike {
     pub fn delete_character_from_current_buffer(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
+
+            self.cursor_history.record_undo_position(pos);
+
             let data = buffer.data();
 
             let lines: Vec<&str> = data.split('\n').collect();
