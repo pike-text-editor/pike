@@ -54,6 +54,14 @@ impl Pike {
             Workspace::new(&cwd, None).map_err(|e| format!("Error creating workspace: {}", e))?;
 
         if let Some(cwf) = cwf {
+            // Check if file exits, if not, create it
+            if !cwf.exists() {
+                if let Some(parent) = cwf.parent() {
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create directory: {}", e))?;
+                }
+                File::create(&cwf).map_err(|e| format!("Failed to create file: {}", e))?;
+            }
             // Open the given file
             workspace
                 .open_buffer(cwf.as_path())
