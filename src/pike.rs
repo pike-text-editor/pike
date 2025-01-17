@@ -205,10 +205,133 @@ impl Pike {
         }
     }
 
+    pub fn move_cursor_to_start_of_line(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_to_start_of_line();
+        }
+    }
+
+    pub fn move_cursor_to_end_of_line(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_to_end_of_line();
+        }
+    }
+
+    pub fn move_cursor_left_by_word(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            let pos = buffer.cursor.position;
+
+            // Split the entire buffer by lines.
+            let data = buffer.data();
+            let lines: Vec<&str> = data.lines().collect();
+            if lines.is_empty() {
+                return; // nothing to move around
+            }
+
+            // If we're already at the very start of the file, do nothing.
+            if pos.line == 0 && pos.offset == 0 {
+                return;
+            }
+
+            // Determine the new line and offset (which we will move to).
+            // If the offset is 0, we need to move up one line.
+            let mut new_line = pos.line;
+            let mut new_offset = pos.offset;
+
+            if new_offset == 0 {
+                // Move up a line, set offset to the end of that line.
+                new_line -= 1;
+                let prev_line_str = lines[new_line];
+                new_offset = prev_line_str.len();
+            }
+
+            // Now we’re guaranteed to have new_offset > 0
+            // (because if it was zero, we just moved up a line).
+            let line_str = lines[new_line];
+            let mut idx = new_offset;
+
+            // Skip trailing whitespace leftwards
+            while idx > 0 && line_str.chars().nth(idx - 1).unwrap().is_whitespace() {
+                idx -= 1;
+            }
+
+            // Skip over the word leftwards
+            while idx > 0 && !line_str.chars().nth(idx - 1).unwrap().is_whitespace() {
+                idx -= 1;
+            }
+
+            new_offset = idx;
+
+            buffer.cursor.move_to(BufferPosition {
+                line: new_line,
+                offset: new_offset,
+            });
+        }
+    }
+
+    pub fn move_cursor_right_by_word(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            let pos = buffer.cursor.position;
+
+            // Split the entire buffer by lines.
+            let data = buffer.data();
+            let lines: Vec<&str> = data.lines().collect();
+            // If there's nothing in the buffer, no movement.
+            if lines.is_empty() {
+                return;
+            }
+
+            let current_line_len = lines[pos.line].len();
+
+            // Check if we are at the very end of the file already.
+            // i.e., at the last line and at the line's end.
+            if pos.line == lines.len() - 1 && pos.offset == current_line_len {
+                return; // Can't move further right
+            }
+
+            let (mut new_line, mut new_offset) = (pos.line, pos.offset);
+
+            // If we are at the end of the current line, move down to the next line (offset = 0).
+            if new_offset >= current_line_len {
+                new_line += 1;
+                new_offset = 0;
+            } else {
+                // Otherwise, we are somewhere in the middle of the line.
+                let line_str = lines[new_line];
+                let line_len = line_str.len();
+
+                // Skip over any whitespace to the right
+                while new_offset < line_len
+                    && line_str.chars().nth(new_offset).unwrap().is_whitespace()
+                {
+                    new_offset += 1;
+                }
+
+                // Skip over the word to the right
+                while new_offset < line_len
+                    && !line_str.chars().nth(new_offset).unwrap().is_whitespace()
+                {
+                    new_offset += 1;
+                }
+            }
+
+            buffer.cursor.move_to(BufferPosition {
+                line: new_line,
+                offset: new_offset,
+            });
+        }
+    }
+
     /// Move the cursor right if possible, else do nothing
     pub fn move_cursor_right(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_right();
+        }
+    }
+
+    pub fn move_cursor_to(&mut self, pos: BufferPosition) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_to(pos);
         }
     }
 
