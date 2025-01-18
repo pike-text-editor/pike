@@ -150,6 +150,62 @@ impl UIState {
     fn base_rect_position(area: &Rect) -> (u16, u16) {
         (area.x, area.y)
     }
+
+    pub fn update_highlights(&mut self, highlights: Vec<Highlight>) {
+        self.buffer_state.highlight_state.highlights = highlights;
+        let focused_highlight = self.buffer_state.highlight_state.focused;
+        self.buffer_state.highlight_state.highlights[focused_highlight].is_selected = true;
+    }
+
+    pub fn focused_highlight_position(&mut self) -> BufferPosition {
+        let focused_highlight = self.buffer_state.highlight_state.focused;
+        let highlight = &self.buffer_state.highlight_state.highlights[focused_highlight];
+        highlight.start
+    }
+
+    pub fn focus_next_highlight(&mut self) {
+        let highlights = &mut self.buffer_state.highlight_state.highlights;
+
+        let currently_focused = self.buffer_state.highlight_state.focused;
+
+        let next_highlight = currently_focused + 1;
+
+        highlights[currently_focused].is_selected = false;
+
+        let n_of_highlights = highlights.len();
+
+        if next_highlight < n_of_highlights {
+            highlights[next_highlight].is_selected = true;
+            self.buffer_state.highlight_state.focused = next_highlight;
+        } else {
+            highlights[0].is_selected = true;
+            self.buffer_state.highlight_state.focused = 0;
+        }
+    }
+
+    pub fn focus_prev_highlight(&mut self) {
+        let highlights = &mut self.buffer_state.highlight_state.highlights;
+
+        let currently_focused = self.buffer_state.highlight_state.focused;
+
+        let prev_highlight = currently_focused.saturating_sub(1);
+
+        highlights[currently_focused].is_selected = false;
+
+        if currently_focused > 0 {
+            highlights[prev_highlight].is_selected = true;
+            self.buffer_state.highlight_state.focused = prev_highlight;
+        } else {
+            let n_of_highlights = highlights.len();
+            highlights[n_of_highlights - 1].is_selected = true;
+            self.buffer_state.highlight_state.focused = n_of_highlights - 1;
+        }
+    }
+
+    pub fn clear_highlights(&mut self) {
+        self.buffer_state.highlight_state.highlights.clear();
+        self.buffer_state.highlight_state.focused = 0;
+    }
 }
 
 /// Holds the information how much offset is the
