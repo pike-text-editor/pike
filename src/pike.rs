@@ -5,7 +5,6 @@ use crate::config;
 use crate::config::Config;
 use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
-use ratatui::layout::Position;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 use unicode_segmentation::UnicodeSegmentation;
@@ -24,6 +23,13 @@ impl CursorHistory {
         // Once you record a new position, clear the redo stack.
         self.redo_stack.clear();
     }
+}
+
+#[derive(Default)]
+pub struct Highlight {
+    pub start: BufferPosition,
+    pub length: usize,
+    pub is_selected: bool,
 }
 
 /// Backend of the app
