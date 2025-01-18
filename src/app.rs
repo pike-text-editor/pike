@@ -837,4 +837,51 @@ mod tests {
             .expect("Failed to handle key event");
         assert_eq!(app.backend.current_buffer_contents(), "");
     }
+
+    #[test]
+    fn handles_navigation_keys() {
+        let mut app = app_with_file_contents("line1\nline2\nline3");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
+
+        // Test cases for navigation
+        let navigation_cases = vec![
+            (KeyEvent::new(KeyCode::Left, KeyModifiers::NONE), (0, 0)),
+            (KeyEvent::new(KeyCode::Right, KeyModifiers::NONE), (1, 0)),
+            (KeyEvent::new(KeyCode::Up, KeyModifiers::NONE), (1, 0)), // Should remain at the top
+            (KeyEvent::new(KeyCode::Down, KeyModifiers::NONE), (1, 1)), // Moves to the second line
+            (KeyEvent::new(KeyCode::End, KeyModifiers::NONE), (5, 1)), // End of second line
+            (KeyEvent::new(KeyCode::Home, KeyModifiers::NONE), (0, 1)), // Start of second line
+            (
+                KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL),
+                (0, 0), // Move left by word (should go to line start)
+            ),
+            (
+                KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL),
+                (5, 0), // Move right by word (end of line)
+            ),
+        ];
+
+        for (event, expected_pos) in navigation_cases {
+            assert!(
+                app.try_handle_navigation(event),
+                "Navigation event {:?} was not handled",
+                event
+            );
+            acrp_based_on_current_buffer(&mut app, &buf, expected_pos);
+        }
+    }
+
+    #[test]
+    fn doesnt_handle_navigation_events_unrelated_to_navigation() {
+        let mut app = app_with_file_contents("line1\nline2\nline3");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
+
+        let event = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
+        assert!(
+            !app.try_handle_navigation(event),
+            "Navigation event {:?} was handled",
+            event
+        );
+        acrp_based_on_current_buffer(&mut app, &buf, (0, 0));
+    }
 }
