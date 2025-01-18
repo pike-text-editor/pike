@@ -12,3 +12,4 @@ scribe = { git="https://github.com/mbienkowsk/scribe", branch="main" }
 tempfile = "3.14.0"
 toml = "0.8.19"
 tui-input = "0.11.1"
+unicode-segmentation = "1.12.0"
