@@ -378,29 +378,15 @@ impl App {
 
     fn handle_operation(&mut self, op: &Operation) {
         match op {
-            Operation::OpenFile => {
-                self.open_file_input("", FileInputRole::GetOpenPath);
-            }
-            Operation::Quit => {
-                self.exit();
-            }
+            Operation::OpenFile => self.open_file_input("", FileInputRole::GetOpenPath),
+            Operation::Quit => self.exit(),
             Operation::CreateNewBuffer => self.backend.open_new_buffer(),
             Operation::SwitchToPreviousBuffer => self.backend.previous_buffer(),
             Operation::SwitchToNextBuffer => self.backend.next_buffer(),
             Operation::SaveBufferToFile => self.handle_save_operation(),
-
             Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
-            Operation::SearchAndReplaceInCurrentBuffer => {
-                todo!("Handle SearchAndReplaceInCurrentBuffer operation")
-            }
-
             Operation::Undo => self.backend.undo(),
             Operation::Redo => self.backend.redo(),
-
-            // WARN: these probably won't be supported
-            Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
-            Operation::FindTextInCWD => todo!("Handle FindTextInCWD operation"),
-            Operation::OpenBufferPicker => todo!("Handle OpenBufferPicker operation"),
         }
     }
 
