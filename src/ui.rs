@@ -9,6 +9,8 @@ use std::rc::Rc;
 use std::{cmp::min, path::PathBuf};
 use tui_input::{Input, InputRequest};
 
+use crate::pike::Highlight;
+
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
 /// selected (similarly to telescope.nvim) so that we can reuse
@@ -168,17 +170,26 @@ impl BufferDisplayOffset {
         BufferDisplayOffset { x, y }
     }
 }
+#[derive(Default)]
+pub struct HighlightState {
+    pub highlights: Vec<Highlight>,
+    pub focused: usize,
+}
 
 #[derive(Default)]
 /// Represents the state of a buffer display, including its contents, cursor position, and offset.
 pub struct BufferDisplayState {
     pub offset: BufferDisplayOffset,
+    pub highlight_state: HighlightState,
 }
 
 #[allow(dead_code)]
 impl BufferDisplayState {
     pub fn new(offset: BufferDisplayOffset) -> Self {
-        BufferDisplayState { offset }
+        BufferDisplayState {
+            offset,
+            highlight_state: HighlightState::default(),
+        }
     }
     /// Updates the x offset of the buffer so that the cursor is always visible
     pub fn update_x_offset(&mut self, area: Rect, cursor_offset_x: usize) {
