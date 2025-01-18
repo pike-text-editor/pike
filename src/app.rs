@@ -113,7 +113,7 @@ impl App {
         } else if let Some(ref search_input) = search_input_value {
             self.render_search_input(status_bar_area, frame.buffer_mut());
             render_cursor_position = self.ui_state.calculate_cursor_position(
-                CursorCalculationMode::FileInput(&search_input),
+                CursorCalculationMode::FileInput(search_input),
                 &layout,
                 cursor_pos,
             );
