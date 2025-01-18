@@ -134,16 +134,8 @@ impl Default for Config {
                 Operation::SwitchToPreviousBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
-                Operation::OpenBufferPicker,
-            ),
-            (
                 KeyShortcut::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
                 Operation::SearchInCurrentBuffer,
-            ),
-            (
-                KeyShortcut::new(KeyCode::Char('j'), KeyModifiers::CONTROL),
-                Operation::SearchAndReplaceInCurrentBuffer,
             ),
             (
                 KeyShortcut::new(KeyCode::Char('z'), KeyModifiers::CONTROL),
@@ -152,20 +144,6 @@ impl Default for Config {
             (
                 KeyShortcut::new(KeyCode::Char('y'), KeyModifiers::CONTROL),
                 Operation::Redo,
-            ),
-            (
-                KeyShortcut::new(
-                    KeyCode::Char('f'),
-                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
-                ),
-                Operation::FindFilesInCWD,
-            ),
-            (
-                KeyShortcut::new(
-                    KeyCode::Char('p'),
-                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
-                ),
-                Operation::FindTextInCWD,
             ),
             (
                 KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
@@ -222,16 +200,8 @@ mod config_test {
                 Operation::SwitchToPreviousBuffer,
             ),
             (
-                KeyShortcut::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
-                Operation::OpenBufferPicker,
-            ),
-            (
                 KeyShortcut::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
                 Operation::SearchInCurrentBuffer,
-            ),
-            (
-                KeyShortcut::new(KeyCode::Char('j'), KeyModifiers::CONTROL),
-                Operation::SearchAndReplaceInCurrentBuffer,
             ),
             (
                 KeyShortcut::new(KeyCode::Char('z'), KeyModifiers::CONTROL),
@@ -240,20 +210,6 @@ mod config_test {
             (
                 KeyShortcut::new(KeyCode::Char('y'), KeyModifiers::CONTROL),
                 Operation::Redo,
-            ),
-            (
-                KeyShortcut::new(
-                    KeyCode::Char('f'),
-                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
-                ),
-                Operation::FindFilesInCWD,
-            ),
-            (
-                KeyShortcut::new(
-                    KeyCode::Char('p'),
-                    KeyModifiers::SHIFT | KeyModifiers::CONTROL,
-                ),
-                Operation::FindTextInCWD,
             ),
             (
                 KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::CONTROL),

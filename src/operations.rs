@@ -3,23 +3,13 @@
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Operation {
     OpenFile,
-
     CreateNewBuffer,
     SwitchToPreviousBuffer,
     SwitchToNextBuffer,
-    OpenBufferPicker,
-
     SearchInCurrentBuffer,
-    SearchAndReplaceInCurrentBuffer,
-
     SaveBufferToFile,
-
     Undo,
     Redo,
-
-    FindFilesInCWD,
-    FindTextInCWD,
-
     Quit,
 }
 
@@ -32,14 +22,10 @@ impl Operation {
             "new_buffer" => Operation::CreateNewBuffer,
             "previous_buffer" => Operation::SwitchToPreviousBuffer,
             "next_buffer" => Operation::SwitchToNextBuffer,
-            "open_buffer_picker" => Operation::OpenBufferPicker,
             "search_in_current_buffer" => Operation::SearchInCurrentBuffer,
-            "replace_in_current_buffer" => Operation::SearchAndReplaceInCurrentBuffer,
             "save" => Operation::SaveBufferToFile,
             "undo" => Operation::Undo,
             "redo" => Operation::Redo,
-            "find_files_in_cwd" => Operation::FindFilesInCWD,
-            "find_text_in_cwd" => Operation::FindTextInCWD,
             "quit" => Operation::Quit,
             _ => return Err(format!("Invalid operation in config: {query}")),
         };
