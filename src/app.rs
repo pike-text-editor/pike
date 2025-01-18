@@ -301,6 +301,10 @@ impl App {
                     vec![]
                 });
 
+            if highlights.is_empty() {
+                self.ui_state.clear_highlights();
+                return true;
+            }
             self.ui_state.update_highlights(highlights);
             self.backend
                 .move_cursor_to(self.ui_state.focused_highlight_position());
@@ -308,14 +312,28 @@ impl App {
             return true;
         }
 
-        if (key.code, key.modifiers) == (KeyCode::Right, KeyModifiers::NONE) {
+        if (key.code, key.modifiers) == (KeyCode::Right, KeyModifiers::NONE)
+            && !self
+                .ui_state
+                .buffer_state
+                .highlight_state
+                .highlights
+                .is_empty()
+        {
             self.ui_state.focus_next_highlight();
             self.backend
                 .move_cursor_to(self.ui_state.focused_highlight_position());
             return true;
         }
 
-        if (key.code, key.modifiers) == (KeyCode::Left, KeyModifiers::NONE) {
+        if (key.code, key.modifiers) == (KeyCode::Left, KeyModifiers::NONE)
+            && !self
+                .ui_state
+                .buffer_state
+                .highlight_state
+                .highlights
+                .is_empty()
+        {
             self.ui_state.focus_prev_highlight();
             return true;
         }
