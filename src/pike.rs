@@ -7,6 +7,7 @@ use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Cursor history
 #[derive(Default)]
@@ -297,25 +298,23 @@ impl Pike {
                 // Move up a line, set offset to the end of that line.
                 new_line -= 1;
                 let prev_line_str = lines[new_line];
-                new_offset = prev_line_str.len();
+                new_offset = prev_line_str.graphemes(true).count();
             }
 
             // Now we’re guaranteed to have new_offset > 0
             // (because if it was zero, we just moved up a line).
             let line_str = lines[new_line];
-            let mut idx = new_offset;
+            let graphemes: Vec<&str> = line_str.graphemes(true).collect();
 
             // Skip trailing whitespace leftwards
-            while idx > 0 && line_str.chars().nth(idx - 1).unwrap().is_whitespace() {
-                idx -= 1;
+            while new_offset > 0 && graphemes[new_offset - 1].trim().is_empty() {
+                new_offset -= 1;
             }
 
             // Skip over the word leftwards
-            while idx > 0 && !line_str.chars().nth(idx - 1).unwrap().is_whitespace() {
-                idx -= 1;
+            while new_offset > 0 && !graphemes[new_offset - 1].trim().is_empty() {
+                new_offset -= 1;
             }
-
-            new_offset = idx;
 
             buffer.cursor.move_to(BufferPosition {
                 line: new_line,
@@ -331,17 +330,18 @@ impl Pike {
             // Split the entire buffer by lines.
             let data = buffer.data();
             let lines: Vec<&str> = data.lines().collect();
+
             // If there's nothing in the buffer, no movement.
             if lines.is_empty() {
                 return;
             }
 
-            let current_line_len = lines[pos.line].len();
+            let current_line_len = lines[pos.line].graphemes(true).count();
 
-            // Check if we are at the very end of the file already.
+            // Check if we are at the very end of the file.
             // i.e., at the last line and at the line's end.
             if pos.line == lines.len() - 1 && pos.offset == current_line_len {
-                return; // Can't move further right
+                return;
             }
 
             let (mut new_line, mut new_offset) = (pos.line, pos.offset);
@@ -353,19 +353,16 @@ impl Pike {
             } else {
                 // Otherwise, we are somewhere in the middle of the line.
                 let line_str = lines[new_line];
-                let line_len = line_str.len();
+                let graphemes: Vec<&str> = line_str.graphemes(true).collect();
+                let line_len = graphemes.len();
 
                 // Skip over any whitespace to the right
-                while new_offset < line_len
-                    && line_str.chars().nth(new_offset).unwrap().is_whitespace()
-                {
+                while new_offset < line_len && graphemes[new_offset].trim().is_empty() {
                     new_offset += 1;
                 }
 
                 // Skip over the word to the right
-                while new_offset < line_len
-                    && !line_str.chars().nth(new_offset).unwrap().is_whitespace()
-                {
+                while new_offset < line_len && !graphemes[new_offset].trim().is_empty() {
                     new_offset += 1;
                 }
             }
@@ -855,6 +852,85 @@ mod pike_test {
         assert_eq!(
             pike.cursor_position(),
             Some(Position { line: 0, offset: 3 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_left_by_word_with_unicode() {
+        let contents = "aaa ę aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 6 });
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 4 })
+        );
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_right_by_word_with_unicode() {
+        let contents = "aaa ę aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 0 });
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 3 })
+        );
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 5 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_right_and_left_with_combining_unicode() {
+        let contents = "ęęę ęęę";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 0 });
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 3 })
+        );
+
+        pike.move_cursor_right_by_word();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 7 })
+        );
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 4 })
+        );
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
         );
     }
 
