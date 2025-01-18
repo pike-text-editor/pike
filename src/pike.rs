@@ -1174,6 +1174,7 @@ mod pike_test {
             .expect("No buffer is currently open");
 
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0], Position { line: 0, offset: 7 });
+        assert_eq!(results[0].start, Position { line: 0, offset: 7 });
+        assert_eq!(results[0].length, 5);
     }
 }
