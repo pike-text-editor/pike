@@ -285,7 +285,7 @@ impl App {
             return Ok(());
         }
 
-        if self.try_handle_input_key(key) && !key.modifiers.contains(KeyModifiers::CONTROL) {
+        if !key.modifiers.contains(KeyModifiers::CONTROL) && self.try_handle_input_key(key) {
             return Ok(());
         }
 
@@ -822,5 +822,14 @@ mod tests {
             app.ui_state.file_input.as_ref().unwrap().role,
             FileInputRole::GetSavePath
         );
+    }
+
+    #[test]
+    fn app_does_not_write_to_file_when_key_is_pressed_with_ctrl() {
+        let mut app = app_with_file_contents("");
+        let event = KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL);
+        app.handle_key_event(event)
+            .expect("Failed to handle key event");
+        assert_eq!(app.backend.current_buffer_contents(), "");
     }
 }
