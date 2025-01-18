@@ -7,12 +7,30 @@ use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
+use unicode_segmentation::UnicodeSegmentation;
+
+/// Cursor history
+#[derive(Default)]
+struct CursorHistory {
+    undo_stack: Vec<BufferPosition>,
+    redo_stack: Vec<BufferPosition>,
+}
+
+impl CursorHistory {
+    /// Record a new cursor position on the undo stack.
+    fn record_undo_position(&mut self, pos: BufferPosition) {
+        self.undo_stack.push(pos);
+        // Once you record a new position, clear the redo stack.
+        self.redo_stack.clear();
+    }
+}
 
 /// Backend of the app
 #[allow(dead_code, unused_variables, unused_mut)]
 pub struct Pike {
     workspace: Workspace,
     config: Config,
+    cursor_history: CursorHistory,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -37,6 +55,14 @@ impl Pike {
             Workspace::new(&cwd, None).map_err(|e| format!("Error creating workspace: {}", e))?;
 
         if let Some(cwf) = cwf {
+            // Check if file exits, if not, create it
+            if !cwf.exists() {
+                if let Some(parent) = cwf.parent() {
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create directory: {}", e))?;
+                }
+                File::create(&cwf).map_err(|e| format!("Failed to create file: {}", e))?;
+            }
             // Open the given file
             workspace
                 .open_buffer(cwf.as_path())
@@ -50,6 +76,7 @@ impl Pike {
             workspace,
             config: Config::from_file(config_file.as_deref())
                 .map_err(|e| format!("Error loading config: {}", e))?,
+            cursor_history: CursorHistory::default(),
         })
     }
 
@@ -96,7 +123,33 @@ impl Pike {
     pub fn write_to_current_buffer(&mut self, text: &str) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
+                // Remember the cursor position before inserting
+                let start_position = buffer.cursor.position;
+
+                self.cursor_history.record_undo_position(start_position);
+
                 buffer.insert(text);
+
+                // Calculate how many lines the inserted text spans
+                let lines: Vec<&str> = text.split('\n').collect();
+                let line_count = lines.len() - 1;
+
+                // On the final line, check where it ends
+                let last_line_len = lines.last().map_or(0, |l| l.chars().count());
+
+                // If no newlines were inserted, just advance on the same line
+                // Otherwise, move down line_count lines, then set offset to the length of the last line
+                let new_line = start_position.line + line_count;
+                let new_offset = if line_count == 0 {
+                    start_position.offset + last_line_len
+                } else {
+                    last_line_len
+                };
+
+                buffer.cursor.move_to(scribe::buffer::Position {
+                    line: new_line,
+                    offset: new_offset,
+                });
 
                 Ok(())
             }
@@ -108,6 +161,9 @@ impl Pike {
     pub fn delete_character_from_current_buffer(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
+
+            self.cursor_history.record_undo_position(pos);
+
             let data = buffer.data();
 
             let lines: Vec<&str> = data.split('\n').collect();
@@ -205,10 +261,129 @@ impl Pike {
         }
     }
 
+    pub fn move_cursor_to_start_of_line(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_to_start_of_line();
+        }
+    }
+
+    pub fn move_cursor_to_end_of_line(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_to_end_of_line();
+        }
+    }
+
+    pub fn move_cursor_left_by_word(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            let pos = buffer.cursor.position;
+
+            // Split the entire buffer by lines.
+            let data = buffer.data();
+            let lines: Vec<&str> = data.lines().collect();
+            if lines.is_empty() {
+                return; // nothing to move around
+            }
+
+            // If we're already at the very start of the file, do nothing.
+            if pos.line == 0 && pos.offset == 0 {
+                return;
+            }
+
+            // Determine the new line and offset (which we will move to).
+            // If the offset is 0, we need to move up one line.
+            let mut new_line = pos.line;
+            let mut new_offset = pos.offset;
+
+            if new_offset == 0 {
+                // Move up a line, set offset to the end of that line.
+                new_line -= 1;
+                let prev_line_str = lines[new_line];
+                new_offset = prev_line_str.graphemes(true).count();
+            }
+
+            // Now we’re guaranteed to have new_offset > 0
+            // (because if it was zero, we just moved up a line).
+            let line_str = lines[new_line];
+            let graphemes: Vec<&str> = line_str.graphemes(true).collect();
+
+            // Skip trailing whitespace leftwards
+            while new_offset > 0 && graphemes[new_offset - 1].trim().is_empty() {
+                new_offset -= 1;
+            }
+
+            // Skip over the word leftwards
+            while new_offset > 0 && !graphemes[new_offset - 1].trim().is_empty() {
+                new_offset -= 1;
+            }
+
+            buffer.cursor.move_to(BufferPosition {
+                line: new_line,
+                offset: new_offset,
+            });
+        }
+    }
+
+    pub fn move_cursor_right_by_word(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            let pos = buffer.cursor.position;
+
+            // Split the entire buffer by lines.
+            let data = buffer.data();
+            let lines: Vec<&str> = data.lines().collect();
+
+            // If there's nothing in the buffer, no movement.
+            if lines.is_empty() {
+                return;
+            }
+
+            let current_line_len = lines[pos.line].graphemes(true).count();
+
+            // Check if we are at the very end of the file.
+            // i.e., at the last line and at the line's end.
+            if pos.line == lines.len() - 1 && pos.offset == current_line_len {
+                return;
+            }
+
+            let (mut new_line, mut new_offset) = (pos.line, pos.offset);
+
+            // If we are at the end of the current line, move down to the next line (offset = 0).
+            if new_offset >= current_line_len {
+                new_line += 1;
+                new_offset = 0;
+            } else {
+                // Otherwise, we are somewhere in the middle of the line.
+                let line_str = lines[new_line];
+                let graphemes: Vec<&str> = line_str.graphemes(true).collect();
+                let line_len = graphemes.len();
+
+                // Skip over any whitespace to the right
+                while new_offset < line_len && graphemes[new_offset].trim().is_empty() {
+                    new_offset += 1;
+                }
+
+                // Skip over the word to the right
+                while new_offset < line_len && !graphemes[new_offset].trim().is_empty() {
+                    new_offset += 1;
+                }
+            }
+
+            buffer.cursor.move_to(BufferPosition {
+                line: new_line,
+                offset: new_offset,
+            });
+        }
+    }
+
     /// Move the cursor right if possible, else do nothing
     pub fn move_cursor_right(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_right();
+        }
+    }
+
+    pub fn move_cursor_to(&mut self, pos: BufferPosition) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            buffer.cursor.move_to(pos);
         }
     }
 
@@ -234,11 +409,15 @@ impl Pike {
     /// Switch to the previous buffer
     pub fn previous_buffer(&mut self) {
         self.workspace.previous_buffer();
+        // Clear the cursor history when switching buffers
+        self.cursor_history = CursorHistory::default();
     }
 
     /// Switch to the next buffer
     pub fn next_buffer(&mut self) {
         self.workspace.next_buffer();
+        // Clear the cursor history when switching buffers
+        self.cursor_history = CursorHistory::default();
     }
 
     /// Search for a query in the current buffer and return
@@ -271,14 +450,39 @@ impl Pike {
         }
     }
 
-    /// Undo the last change in the current buffer
-    fn undo(&mut self) {
-        todo!()
+    /// Undo the last change in the current buffer and adjust the cursor position
+    pub fn undo(&mut self) {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            // If there's a recorded position, pop it off
+            if let Some(prev_pos) = self.cursor_history.undo_stack.pop() {
+                // Push the current cursor position onto redo stack.
+                let current_pos = buf.cursor.position;
+                self.cursor_history.redo_stack.push(current_pos);
+
+                buf.undo();
+
+                // Move cursor to the old position
+                buf.cursor.move_to(prev_pos);
+            }
+        }
     }
 
-    /// Redo the last change in the current buffer
-    fn redo(&mut self) {
-        todo!()
+    /// Redo the last change in the current buffer and adjust the cursor position
+    pub fn redo(&mut self) {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            // If there's a position we previously popped off, pop it from redo
+            if let Some(pos) = self.cursor_history.redo_stack.pop() {
+                // Push the current cursor position onto undo stack
+                // so we can jump back if we undo the redo.
+                let current_pos = buf.cursor.position;
+                self.cursor_history.undo_stack.push(current_pos);
+
+                buf.redo();
+
+                // Move the cursor to the position after redo
+                buf.cursor.move_to(pos);
+            }
+        }
     }
 
     /// Returns the current working directory as a pathbuf
@@ -474,6 +678,9 @@ mod pike_test {
         let result = pike.write_to_current_buffer("Hello, world!");
         assert!(result.is_ok());
         assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+        pike.write_to_current_buffer(" Its me!")
+            .expect("Failed to write to buffer");
+        assert_eq!(pike.current_buffer_contents(), "Hello, world! Its me!");
     }
 
     #[test]
@@ -619,6 +826,115 @@ mod pike_test {
     }
 
     #[test]
+    fn test_move_cursor_left_by_word() {
+        let contents = "aaa aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 4 });
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_right_by_word() {
+        let contents = "aaa aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 0 });
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 3 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_left_by_word_with_unicode() {
+        let contents = "aaa ę aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 6 });
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 4 })
+        );
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_right_by_word_with_unicode() {
+        let contents = "aaa ę aaa";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 0 });
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 3 })
+        );
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 5 })
+        );
+    }
+
+    #[test]
+    fn test_move_cursor_right_and_left_with_combining_unicode() {
+        let contents = "ęęę ęęę";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
+
+        pike.move_cursor_to(Position { line: 0, offset: 0 });
+
+        pike.move_cursor_right_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 3 })
+        );
+
+        pike.move_cursor_right_by_word();
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 7 })
+        );
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 4 })
+        );
+
+        pike.move_cursor_left_by_word();
+
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position { line: 0, offset: 0 })
+        );
+    }
+
+    #[test]
     fn test_current_line_length_buffer_exists() {
         let contents = ["Hello!", ""].join("\n");
         let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents.as_str()));
@@ -721,5 +1037,110 @@ mod pike_test {
         let contents_from_file =
             fs::read_to_string(file_path).expect("std::fs failed to read from file");
         assert_eq!(file_contents, contents_from_file)
+    }
+
+    #[test]
+    fn test_moving_cursor_when_inserting_many_characters() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        pike.move_cursor_to(Position {
+            line: 0,
+            offset: 13,
+        });
+        pike.write_to_current_buffer(" Its me!")
+            .expect("Failed to write to buffer");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world! Its me!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 21
+            })
+        );
+    }
+
+    #[test]
+    fn test_undo() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        pike.move_cursor_to(Position {
+            line: 0,
+            offset: 13,
+        });
+        pike.write_to_current_buffer("!")
+            .expect("Failed to write to buffer");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 14
+            })
+        );
+
+        pike.undo();
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 13
+            })
+        );
+    }
+
+    #[test]
+    fn test_redo() {
+        let file = temp_file_with_contents("Hello, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file.path(), 0, 0)
+            .expect("Failed to open file");
+
+        pike.move_cursor_to(Position {
+            line: 0,
+            offset: 13,
+        });
+        pike.write_to_current_buffer("!")
+            .expect("Failed to write to buffer");
+
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 14
+            })
+        );
+
+        pike.undo();
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 13
+            })
+        );
+
+        pike.redo();
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!!");
+        assert_eq!(
+            pike.cursor_position(),
+            Some(Position {
+                line: 0,
+                offset: 14
+            })
+        );
     }
 }

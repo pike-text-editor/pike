@@ -211,11 +211,11 @@ impl App {
 
     /// Try to handle the key press using a file input. Returns a boolean
     /// indicating whether the event has been handled or not.
-    fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
+    fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> bool {
         // No input means the event can't be handled
         let input = match self.ui_state.file_input.as_mut() {
             Some(input) => input,
-            None => return Ok(false),
+            None => return false,
         };
 
         // Perform the corresponding operation and close the input
@@ -223,29 +223,29 @@ impl App {
             let path = input.to_path();
             match input.role {
                 FileInputRole::GetOpenPath => self.open_file_from_path(path),
-                FileInputRole::GetSavePath => self.backend.bind_current_buffer_to_path(path),
+                FileInputRole::GetSavePath => {
+                    self.backend.bind_current_buffer_to_path(path);
+                    self.handle_save_operation();
+                }
             }
-            self.backend.save_current_buffer().map_err(|e| {
-                io::Error::new(io::ErrorKind::Other, format!("Error saving buffer: {}", e))
-            })?;
 
             self.close_file_input();
-            return Ok(true);
+            return true;
         }
 
         // Close the input
         if (key.code, key.modifiers) == (KeyCode::Esc, KeyModifiers::NONE) {
             self.close_file_input();
-            return Ok(true);
+            return true;
         }
 
         // Try to create a request to the file input and handle it
         match Self::key_event_to_input_request(key) {
             Some(request) => {
                 input.handle(request);
-                Ok(true)
+                true
             }
-            None => Ok(false),
+            None => false,
         }
     }
 
@@ -277,7 +277,7 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
-        if self.try_handle_key_press_with_file_input(key)? {
+        if self.try_handle_key_press_with_file_input(key) {
             return Ok(());
         }
 
@@ -285,17 +285,25 @@ impl App {
             return Ok(());
         }
 
-        if self.try_handle_input_key(key) {
+        if !key.modifiers.contains(KeyModifiers::CONTROL) && self.try_handle_input_key(key) {
             return Ok(());
         }
 
         match key.code {
             KeyCode::Left => {
-                self.backend.move_cursor_left();
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    self.backend.move_cursor_left_by_word();
+                } else {
+                    self.backend.move_cursor_left();
+                }
                 Ok(())
             }
             KeyCode::Right => {
-                self.backend.move_cursor_right();
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    self.backend.move_cursor_right_by_word();
+                } else {
+                    self.backend.move_cursor_right();
+                }
                 Ok(())
             }
             KeyCode::Up => {
@@ -306,6 +314,15 @@ impl App {
                 self.backend.move_cursor_down();
                 Ok(())
             }
+            KeyCode::End => {
+                self.backend.move_cursor_to_end_of_line();
+                Ok(())
+            }
+            KeyCode::Home => {
+                self.backend.move_cursor_to_start_of_line();
+                Ok(())
+            }
+
             _ => Ok(()),
         }
     }
@@ -343,14 +360,12 @@ impl App {
         // TODO: Better error handling
         if let KeyCode::Char(ch) = key.code {
             let _ = self.backend.write_to_current_buffer(&ch.to_string());
-            self.backend.move_cursor_right();
 
             return true;
         }
         match key.code {
             KeyCode::Enter => {
                 let _ = self.backend.write_to_current_buffer("\n");
-                self.backend.move_cursor_down();
                 true
             }
             KeyCode::Backspace => {
@@ -379,8 +394,8 @@ impl App {
                 todo!("Handle SearchAndReplaceInCurrentBuffer operation")
             }
 
-            Operation::Undo => todo!("Handle Undo operation"),
-            Operation::Redo => todo!("Handle Redo operation"),
+            Operation::Undo => self.backend.undo(),
+            Operation::Redo => self.backend.redo(),
 
             // WARN: these probably won't be supported
             Operation::FindFilesInCWD => todo!("Handle FindFilesInCWD operation"),
@@ -807,5 +822,14 @@ mod tests {
             app.ui_state.file_input.as_ref().unwrap().role,
             FileInputRole::GetSavePath
         );
+    }
+
+    #[test]
+    fn app_does_not_write_to_file_when_key_is_pressed_with_ctrl() {
+        let mut app = app_with_file_contents("");
+        let event = KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL);
+        app.handle_key_event(event)
+            .expect("Failed to handle key event");
+        assert_eq!(app.backend.current_buffer_contents(), "");
     }
 }
