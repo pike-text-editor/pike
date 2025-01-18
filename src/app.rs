@@ -289,6 +289,12 @@ impl App {
             return Ok(());
         }
 
+        self.try_handle_navigation(key);
+
+        Ok(())
+    }
+
+    fn try_handle_navigation(&mut self, key: KeyEvent) -> bool {
         match key.code {
             KeyCode::Left => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -296,7 +302,7 @@ impl App {
                 } else {
                     self.backend.move_cursor_left();
                 }
-                Ok(())
+                true
             }
             KeyCode::Right => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -304,26 +310,25 @@ impl App {
                 } else {
                     self.backend.move_cursor_right();
                 }
-                Ok(())
+                true
             }
             KeyCode::Up => {
                 self.backend.move_cursor_up();
-                Ok(())
+                true
             }
             KeyCode::Down => {
                 self.backend.move_cursor_down();
-                Ok(())
+                true
             }
             KeyCode::End => {
                 self.backend.move_cursor_to_end_of_line();
-                Ok(())
+                true
             }
             KeyCode::Home => {
                 self.backend.move_cursor_to_start_of_line();
-                Ok(())
+                true
             }
-
-            _ => Ok(()),
+            _ => false,
         }
     }
 
