@@ -5,6 +5,7 @@ use crate::config;
 use crate::config::Config;
 use crate::key_shortcut::KeyShortcut;
 use crate::operations::Operation;
+use ratatui::layout::Position;
 use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 use unicode_segmentation::UnicodeSegmentation;
@@ -422,8 +423,12 @@ impl Pike {
 
     /// Search for a query in the current buffer and return
     /// the results in the form of a vec of offsets
-    fn search_in_current_buffer(&mut self, query: &str) -> Vec<usize> {
-        todo!()
+    fn search_in_current_buffer(&mut self, query: &str) -> Result<Vec<BufferPosition>, String> {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            Ok(buf.search(query))
+        } else {
+            Err("No buffer is currently open".to_string())
+        }
     }
 
     /// Replace all occurences of query with replacement in the current buffer
@@ -1142,5 +1147,18 @@ mod pike_test {
                 offset: 14
             })
         );
+    }
+
+    #[test]
+    fn test_search_in_current_buffer() {
+        let file_contents = "Hello, world!";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(file_contents));
+
+        let results = pike
+            .search_in_current_buffer("world")
+            .expect("No buffer is currently open");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], Position { line: 0, offset: 7 });
     }
 }
