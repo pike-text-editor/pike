@@ -1,7 +1,8 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Position as TerminalPosition, Rect},
-    text::{Text, ToText},
+    style::{Color, Modifier, Style},
+    text::{Line, Span, Text, ToText},
     widgets::{self, Paragraph, StatefulWidget, Widget},
 };
 use scribe::buffer::Position as BufferPosition;
@@ -70,6 +71,7 @@ pub struct UIState {
     /// A text input used to enter the filepath when saving an unbound buffer
     /// and opening a new file
     pub file_input: Option<FileInputState>,
+    pub search_input: Option<Input>,
 }
 
 impl UIState {
