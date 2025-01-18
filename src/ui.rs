@@ -439,13 +439,16 @@ impl StatefulWidget for SearchInput {
 
 #[cfg(test)]
 mod tests {
-    use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
-    use tui_input::InputRequest;
-
     use crate::{
         test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border},
-        ui::{FileInputRole, FileInputState},
+        ui::{BufferDisplayOffset, BufferDisplayState, FileInputRole, FileInputState},
     };
+    use ratatui::style::{Color, Modifier, Style};
+    use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
+    use scribe::buffer::Position as BufferPosition;
+    use tui_input::InputRequest;
+
+    use crate::pike::Highlight;
 
     use super::FileInput;
     // TODO: could move some BufferDisplay tests here for clarity
@@ -478,5 +481,154 @@ mod tests {
             text_line,
             vertical_border() + "hello," + &n_spaces(2) + &vertical_border()
         );
+    }
+
+    #[test]
+    fn test_add_highlights_single_line_unselected() {
+        // Setup a default display state with no offset.
+        let mut state = BufferDisplayState::default();
+        state.offset = BufferDisplayOffset::new(0, 0);
+
+        let content = "Hello world";
+        let highlight = Highlight {
+            start: BufferPosition { line: 0, offset: 6 },
+            length: 5,
+            is_selected: false,
+        };
+
+        let text = state.add_highlights(content, &[highlight]);
+
+        // Extract spans and styles from the resulting Text.
+        let lines: Vec<_> = text
+            .lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| (span.content.clone(), span.style))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        // We expect one line with two spans: unhighlighted "Hello " and highlighted "world".
+        assert_eq!(lines.len(), 1);
+        let spans = &lines[0];
+        assert_eq!(spans.len(), 2);
+
+        // First span: "Hello " with default style.
+        assert_eq!(spans[0].0, "Hello ");
+        assert_eq!(spans[0].1, Style::default());
+
+        // Second span: "world" with highlighted style.
+        let expected_style = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(240, 137, 48))
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(spans[1].0, "world");
+        assert_eq!(spans[1].1, expected_style);
+    }
+
+    #[test]
+    fn test_add_highlights_single_line_selected() {
+        // Test with a selected highlight which uses a different background color.
+        let mut state = BufferDisplayState::default();
+        state.offset = BufferDisplayOffset::new(0, 0);
+
+        let content = "Hello world";
+        let highlight = Highlight {
+            start: BufferPosition { line: 0, offset: 6 },
+            length: 5,
+            is_selected: true,
+        };
+
+        let text = state.add_highlights(content, &[highlight]);
+
+        let lines: Vec<_> = text
+            .lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| (span.content.clone(), span.style))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        assert_eq!(lines.len(), 1);
+        let spans = &lines[0];
+        assert_eq!(spans.len(), 2);
+
+        // First span: "Hello " with default style.
+        assert_eq!(spans[0].0, "Hello ");
+        assert_eq!(spans[0].1, Style::default());
+
+        // Second span: "world" with selected highlight style.
+        let expected_style = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(245, 206, 88)) // Selected color
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(spans[1].0, "world");
+        assert_eq!(spans[1].1, expected_style);
+    }
+
+    #[test]
+    fn test_add_highlights_multiple_lines_and_highlights() {
+        let mut state = BufferDisplayState::default();
+        state.offset = BufferDisplayOffset::new(0, 0);
+
+        let content = "Line one\nLine two\nLine three";
+        let highlights = vec![
+            Highlight {
+                start: BufferPosition { line: 0, offset: 5 },
+                length: 3,
+                is_selected: false,
+            },
+            Highlight {
+                start: BufferPosition { line: 1, offset: 5 },
+                length: 3,
+                is_selected: true,
+            },
+        ];
+
+        let text = state.add_highlights(content, &highlights);
+
+        let lines: Vec<_> = text
+            .lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| (span.content.clone(), span.style))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        // Check first line spans.
+        // "Line one" with a highlight on "one"
+        assert!(lines.len() >= 2);
+        let first_line = &lines[0];
+        // Expected spans for first line: ["Line ", highlighted("one")]
+        assert_eq!(first_line.len(), 2);
+        assert_eq!(first_line[0].0, "Line ");
+        assert_eq!(first_line[0].1, Style::default());
+        let expected_style_first = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(240, 137, 48))
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(first_line[1].0, "one");
+        assert_eq!(first_line[1].1, expected_style_first);
+
+        // Check second line spans.
+        // "Line two" with a selected highlight on "two"
+        let second_line = &lines[1];
+        assert_eq!(second_line.len(), 2);
+        assert_eq!(second_line[0].0, "Line ");
+        assert_eq!(second_line[0].1, Style::default());
+        let expected_style_second = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(245, 206, 88)) // Selected highlight color
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(second_line[1].0, "two");
+        assert_eq!(second_line[1].1, expected_style_second);
     }
 }
