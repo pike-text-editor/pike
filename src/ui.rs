@@ -244,6 +244,55 @@ impl BufferDisplayState {
         let down_shifted = self.shift_contents_down(contents);
         self.shift_contents_right(down_shifted)
     }
+    pub fn add_highlights<'a>(&self, contents: &'a str, highlights: &[Highlight]) -> Text<'a> {
+        let mut highlighted_content = vec![];
+        let contents_to_lines = contents.lines().collect::<Vec<&str>>();
+
+        for (line_index, line_text) in contents_to_lines.iter().enumerate() {
+            let mut line = Vec::new();
+            let mut current_pos = 0;
+
+            // Find all highlights in this line, considering the offset
+            for highlight in highlights
+                .iter()
+                .filter(|h| h.start.line == line_index + self.offset.y)
+            {
+                let highlight_start = highlight.start.offset.saturating_sub(self.offset.x);
+                let highlight_end = (highlight_start + highlight.length).min(line_text.len());
+
+                if highlight_start > current_pos {
+                    // Add unhighlighted text before the highlight
+                    line.push(Span::raw(&line_text[current_pos..highlight_start]));
+                }
+
+                let highlight_bg = if highlight.is_selected {
+                    Color::Rgb(245, 206, 88)
+                } else {
+                    Color::Rgb(240, 137, 48)
+                };
+
+                // Add highlighted text
+                line.push(Span::styled(
+                    &line_text[highlight_start..highlight_end],
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(highlight_bg)
+                        .add_modifier(Modifier::BOLD),
+                ));
+
+                current_pos = highlight_end;
+            }
+
+            // Add the remaining unhighlighted text
+            if current_pos < line_text.len() {
+                line.push(Span::raw(&line_text[current_pos..]));
+            }
+
+            highlighted_content.push(Line::from(line));
+        }
+
+        Text::from(highlighted_content)
+    }
 }
 
 /// Widget for displaying the buffer contents. Serves as a thin wrapper
@@ -280,10 +329,17 @@ impl StatefulWidget for BufferDisplayWidget<'_> {
         // Shift contents based on offset
         let shifted_contents = state.shift_contents(self.buffer_contents.to_string());
         // Render the text using Paragraph
-        let text_widget = Text::from(shifted_contents);
-        let paragraph_widget = Paragraph::new(text_widget);
 
-        paragraph_widget.render(area, buf);
+        if !state.highlight_state.highlights.is_empty() {
+            let text_widget =
+                state.add_highlights(&shifted_contents, &state.highlight_state.highlights);
+            let paragraph_widget = Paragraph::new(text_widget);
+            paragraph_widget.render(area, buf);
+        } else {
+            let text_widget = Text::from(shifted_contents);
+            let paragraph_widget = Paragraph::new(text_widget);
+            paragraph_widget.render(area, buf);
+        }
     }
 }
 
