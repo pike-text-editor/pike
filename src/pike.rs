@@ -429,9 +429,18 @@ impl Pike {
 
     /// Search for a query in the current buffer and return
     /// the results in the form of a vec of offsets
-    fn search_in_current_buffer(&mut self, query: &str) -> Result<Vec<BufferPosition>, String> {
+    pub fn search_in_current_buffer(&mut self, query: &str) -> Result<Vec<Highlight>, String> {
         if let Some(buf) = self.workspace.current_buffer.as_mut() {
-            Ok(buf.search(query))
+            let results = buf
+                .search(query)
+                .into_iter()
+                .map(|pos| Highlight {
+                    start: pos,
+                    length: query.len(),
+                    is_selected: false,
+                })
+                .collect();
+            Ok(results)
         } else {
             Err("No buffer is currently open".to_string())
         }
