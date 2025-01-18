@@ -363,6 +363,22 @@ impl StatefulWidget for FileInput {
     }
 }
 
+#[derive(Default)]
+pub struct SearchInput {}
+
+impl StatefulWidget for SearchInput {
+    type State = Input;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let widget = widgets::Paragraph::new(state.to_text()).block(
+            widgets::Block::new()
+                .borders(widgets::Borders::all())
+                .title("Search for: "),
+        );
+        widget.render(area, buf)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
