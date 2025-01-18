@@ -283,6 +283,60 @@ impl App {
         }
     }
 
+    fn try_handle_key_press_with_search_input(&mut self, key: KeyEvent) -> bool {
+        // No input means the event can't be handled
+        let input = match self.ui_state.search_input.as_mut() {
+            Some(input) => input,
+            None => return false,
+        };
+
+        // Perform the corresponding operation and close the input
+        if (key.code, key.modifiers) == (KeyCode::Enter, KeyModifiers::NONE) {
+            let query = input.to_string();
+            let highlights = self
+                .backend
+                .search_in_current_buffer(&query)
+                .unwrap_or_else(|err| {
+                    eprintln!("Error searching in buffer: {}", err);
+                    vec![]
+                });
+
+            self.ui_state.update_highlights(highlights);
+            self.backend
+                .move_cursor_to(self.ui_state.focused_highlight_position());
+
+            return true;
+        }
+
+        if (key.code, key.modifiers) == (KeyCode::Right, KeyModifiers::NONE) {
+            self.ui_state.focus_next_highlight();
+            self.backend
+                .move_cursor_to(self.ui_state.focused_highlight_position());
+            return true;
+        }
+
+        if (key.code, key.modifiers) == (KeyCode::Left, KeyModifiers::NONE) {
+            self.ui_state.focus_prev_highlight();
+            return true;
+        }
+
+        // Close the input
+        if (key.code, key.modifiers) == (KeyCode::Esc, KeyModifiers::NONE) {
+            self.ui_state.clear_highlights();
+            self.close_search_input();
+            return true;
+        }
+
+        // Try to create a request to the file input and handle it
+        match Self::key_event_to_input_request(key) {
+            Some(request) => {
+                input.handle(request);
+                true
+            }
+            None => false,
+        }
+    }
+
     fn open_file_from_path(&mut self, path: PathBuf) {
         self.backend
             .create_and_open_file(&path)
