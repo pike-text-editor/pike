@@ -5,6 +5,7 @@ mod operations;
 mod pike;
 mod test_util;
 mod ui;
+mod welcome_pike;
 
 use clap::Parser;
 use std::io;

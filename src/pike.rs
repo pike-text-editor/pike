@@ -74,11 +74,7 @@ impl Pike {
             workspace
                 .open_buffer(cwf.as_path())
                 .map_err(|_| "Error opening file")?;
-        } else {
-            // Open an empty buffer with no path
-            workspace.add_buffer(Buffer::new());
         }
-
         Ok(Pike {
             workspace,
             config: Config::from_file(config_file.as_deref())
@@ -577,11 +573,7 @@ mod pike_test {
         let (pike, cwd) = tmp_pike_and_working_dir(None, None);
 
         assert_eq!(pike.workspace.path, cwd);
-        assert!(pike
-            .current_buffer()
-            .expect("A buffer should open by default")
-            .path
-            .is_none());
+        assert!(pike.current_buffer().is_none());
         assert!(pike.config == Config::default());
     }
 
@@ -699,8 +691,9 @@ mod pike_test {
     }
 
     #[test]
-    fn test_write_to_default_buffer() {
+    fn test_write_to_unbound_buffer() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         let result = pike.write_to_current_buffer("Hello, world!");
         assert!(result.is_ok());
         assert_eq!(pike.current_buffer_contents(), "Hello, world!");
@@ -726,6 +719,7 @@ mod pike_test {
     #[should_panic]
     fn test_save_buffer_no_path() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         // This situation should not happen as it's handled in the UI, so a panic here
         // is expected
         let _ = pike.save_current_buffer();
@@ -791,9 +785,9 @@ mod pike_test {
     }
 
     #[test]
-    fn test_has_unsaved_changes_no_buffer() {
-        let pike = tmp_pike_and_working_dir(None, None).0;
-
+    fn test_has_unsaved_changes_new_buffer() {
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         assert!(pike.has_unsaved_changes());
     }
 
@@ -1030,11 +1024,10 @@ mod pike_test {
     fn test_open_new_buffer() {
         let file = temp_file_with_contents("Hello, world!");
         let (mut pike, _) = tmp_pike_and_working_dir(None, None);
-        assert_eq!(pike.workspace.buffer_paths().len(), 1);
 
         pike.open_file(file.path(), 0, 0)
             .expect("Failed to open file");
-        assert_eq!(pike.workspace.buffer_paths().len(), 2);
+        assert_eq!(pike.workspace.buffer_paths().len(), 1);
 
         // Should be empty with no path
         pike.open_new_buffer();
@@ -1044,7 +1037,7 @@ mod pike_test {
             .expect("A buffer should be open")
             .path
             .is_none());
-        assert_eq!(pike.workspace.buffer_paths().len(), 3);
+        assert_eq!(pike.workspace.buffer_paths().len(), 2);
     }
 
     #[test]
@@ -1052,6 +1045,7 @@ mod pike_test {
         let file_contents = "Hello, world!";
         let (mut pike, dir) = tmp_pike_and_working_dir(None, None);
         assert!(pike.current_buffer_path().is_none());
+        pike.open_new_buffer();
         pike.write_to_current_buffer(file_contents)
             .expect("Failed to write to current buffer");
 
