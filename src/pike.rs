@@ -9,6 +9,8 @@ use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::welcome_pike::WELCOME_MESSAGE;
+
 /// Cursor history
 #[derive(Default)]
 struct CursorHistory {
@@ -38,6 +40,7 @@ pub struct Pike {
     workspace: Workspace,
     config: Config,
     cursor_history: CursorHistory,
+    welcome_message: Option<String>,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -47,6 +50,7 @@ impl Pike {
         cwd: PathBuf,
         cwf: Option<PathBuf>,
         mut config_file: Option<PathBuf>,
+        no_file_start: bool,
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
         if config_file.is_none() {
@@ -61,6 +65,8 @@ impl Pike {
         let mut workspace =
             Workspace::new(&cwd, None).map_err(|e| format!("Error creating workspace: {}", e))?;
 
+        let mut welcome_message = None;
+
         if let Some(cwf) = cwf {
             // Check if file exits, if not, create it
             if !cwf.exists() {
@@ -74,9 +80,11 @@ impl Pike {
             workspace
                 .open_buffer(cwf.as_path())
                 .map_err(|_| "Error opening file")?;
-        } else {
+        } else if !no_file_start {
             // Open an empty buffer with no path
             workspace.add_buffer(Buffer::new());
+        } else {
+            welcome_message = Some(WELCOME_MESSAGE.to_string());
         }
 
         Ok(Pike {
@@ -84,13 +92,22 @@ impl Pike {
             config: Config::from_file(config_file.as_deref())
                 .map_err(|e| format!("Error loading config: {}", e))?,
             cursor_history: CursorHistory::default(),
+            welcome_message,
         })
+    }
+
+    /// Return welcome message for UI
+    pub fn welcome_message(&self) -> Option<&str> {
+        self.welcome_message.as_deref()
     }
 
     /// Open a file, move its contents into the current buffer
     /// and set the cursor to the offset. If the offset is out of bounds,
     /// the cursor will remain at the start of the file.
     pub fn open_file(&mut self, path: &Path, line: usize, offset: usize) -> Result<(), String> {
+        // Once we want to open a file, we should clear the welcome message
+        self.welcome_message = None;
+
         self.workspace
             .open_buffer(path)
             .map_err(|_| "Error opening file".to_string())?;
@@ -107,6 +124,9 @@ impl Pike {
 
     /// Create a file if if does not exists and open it
     pub fn create_and_open_file(&mut self, path: &Path) -> Result<(), String> {
+        // Once we want to open a file, we should clear the welcome message
+        self.welcome_message = None;
+
         if !path.exists() {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)
@@ -414,6 +434,7 @@ impl Pike {
 
     /// Create a new empty buffer not bound to a path and set it as the current buffer
     pub fn open_new_buffer(&mut self) {
+        self.welcome_message = None;
         let buf = Buffer::new();
         self.workspace.add_buffer(buf);
     }
@@ -559,7 +580,7 @@ mod pike_test {
         let config_path = config_file.as_ref().map(|f| f.path().to_path_buf());
 
         (
-            Pike::build(cwd.clone(), cwf_path, config_path).expect("Failed to build Pike"),
+            Pike::build(cwd.clone(), cwf_path, config_path, false).expect("Failed to build Pike"),
             cwd,
         )
     }
