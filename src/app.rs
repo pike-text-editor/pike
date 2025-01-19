@@ -1,7 +1,13 @@
-use std::{env, io, path::PathBuf, process, rc::Rc};
+use std::{
+    env,
+    io::{self, ErrorKind},
+    path::PathBuf,
+    process,
+    rc::Rc,
+};
 
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Position as TerminalPosition, Rect},
     prelude::{Backend, StatefulWidget},
@@ -235,8 +241,6 @@ impl App {
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key) => self.handle_key_event(key),
-            Event::Mouse(mouse) => self.handle_mouse_event(mouse),
-            Event::Paste(paste) => self.handle_paste_event(paste),
             _ => Ok(()),
         }
     }
@@ -247,14 +251,6 @@ impl App {
             event::KeyEventKind::Release => Ok(()),
             event::KeyEventKind::Repeat => Ok(()),
         }
-    }
-
-    fn handle_paste_event(&self, contents: String) -> Result<(), io::Error> {
-        todo!()
-    }
-
-    fn handle_mouse_event(&self, event: MouseEvent) -> Result<(), io::Error> {
-        todo!()
     }
 
     /// Try to handle the key press using a file input. Returns a boolean
@@ -413,7 +409,7 @@ impl App {
             return Ok(());
         }
 
-        if !key.modifiers.contains(KeyModifiers::CONTROL) && self.try_handle_input_key(key) {
+        if !key.modifiers.contains(KeyModifiers::CONTROL) && self.try_handle_input_key(key)? {
             return Ok(());
         }
 
@@ -455,22 +451,8 @@ impl App {
         }
     }
 
-    fn handle_key_release(&self, key: KeyEvent) -> Result<(), io::Error> {
-        todo!()
-    }
-
     fn exit(&mut self) {
         self.exit = true;
-    }
-
-    /// Open a file finder by name in the current working directory
-    fn find_files_in_cwd(&mut self) {
-        todo!()
-    }
-
-    /// Open a text finder in the current working directory
-    fn find_words_in_cwd() {
-        todo!()
     }
 
     /// Tries to match the given key event to a registered keybind and handle it.
@@ -484,23 +466,27 @@ impl App {
         }
     }
 
-    fn try_handle_input_key(&mut self, key: KeyEvent) -> bool {
+    fn try_handle_input_key(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
         // TODO: Better error handling
         if let KeyCode::Char(ch) = key.code {
-            let _ = self.backend.write_to_current_buffer(&ch.to_string());
+            self.backend
+                .write_to_current_buffer(&ch.to_string())
+                .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
 
-            return true;
+            return Ok(true);
         }
         match key.code {
             KeyCode::Enter => {
-                let _ = self.backend.write_to_current_buffer("\n");
-                true
+                self.backend
+                    .write_to_current_buffer("\n")
+                    .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
+                Ok(true)
             }
             KeyCode::Backspace => {
                 self.backend.delete_character_from_current_buffer();
-                true
+                Ok(true)
             }
-            _ => false,
+            _ => Ok(false),
         }
     }
 
@@ -694,7 +680,6 @@ mod tests {
 
     #[test]
     fn test_render_status_bar() {
-        // TODO: maybe factor this out to another function if needed later
         let file = NamedTempFile::new().expect("Failed to create temporary file");
         let file_path = file.path().to_str().unwrap().to_string();
         let filename = file.path().file_name().unwrap().to_str().unwrap();

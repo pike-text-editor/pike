@@ -214,8 +214,11 @@ impl Pike {
     /// Returns the filename of the current buffer or an empty string
     pub fn current_buffer_filename(&self) -> String {
         match self.current_buffer_path() {
-            // TODO: check this goofy ahh chain
-            Some(path) => path.file_name().unwrap().to_str().unwrap().to_string(),
+            Some(path) => path
+                .file_name()
+                .and_then(|file_name| file_name.to_str())
+                .map(|s| s.to_string())
+                .expect("Failed to convert filename to string"),
             None => String::from(""),
         }
     }
@@ -445,11 +448,6 @@ impl Pike {
         } else {
             Err("No buffer is currently open".to_string())
         }
-    }
-
-    /// Replace all occurences of query with replacement in the current buffer
-    fn replace_in_current_buffer(&mut self, query: &str, replacement: &str) {
-        todo!()
     }
 
     /// Save the current buffer to its file
