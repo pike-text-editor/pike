@@ -23,11 +23,14 @@ The following actions are bindable:
 | Switch to next buffer     | Moves focus to the next buffer in the list                       | ctrl+h                   | "next_buffer"                   |
 | Switch to previous buffer | Moves focus to the previous buffer in the list                   | ctrl+l                   | "previous_buffer"               |
 | Search in current buffer  | Searches for a specific term within the currently active buffer  | ctrl+f                   | "search_in_current_buffer"      |
-| Replace in current buffer | Replaces text within the current buffer based on a search query  | ctrl+j                   | "replace_in_current_buffer"     |
 | Save changes              | Saves the current buffer to its associated file                 | ctrl+s                   | "save"                          |
 | Undo last change          | Reverts the most recent change in the current buffer            | ctrl+z                   | "undo"                          |
 | Redo last change          | Reapplies the most recently undone change in the current buffer | ctrl+y                   | "redo"                          |
 | Quit                      | Closes the application                                           | ctrl+q                   | "quit"                          |
+
+### Search utility
+
+When using the search utility, input the phrase you are looking for. To execute the search, press "**Enter**". To switch between found occurrences use "**Left Arrow**" and "**Right Arrow**"
 
 Keybindings which contain multiple modifiers are not yet supported and will be added
 in the future (<https://docs.rs/crossterm/latest/crossterm/event/struct.KeyboardEnhancementFlags.html>).
