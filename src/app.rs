@@ -189,6 +189,7 @@ impl App {
         );
     }
 
+    /// Render the search input in a given Rect
     fn render_search_input(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         SearchInput::default().render(
             area,
@@ -283,6 +284,9 @@ impl App {
         }
     }
 
+    /// Try to handle key input when search input is open.
+    /// Handles searching, toggling through found items, and quitting.
+    /// Returns a boolean indicating whether the event has been handled or not.
     fn try_handle_key_press_with_search_input(&mut self, key: KeyEvent) -> bool {
         // No input means the event can't be handled
         let input = match self.ui_state.search_input.as_mut() {
@@ -355,6 +359,7 @@ impl App {
         }
     }
 
+    /// Open a file from a given path
     fn open_file_from_path(&mut self, path: PathBuf) {
         self.backend
             .create_and_open_file(&path)

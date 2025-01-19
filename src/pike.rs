@@ -268,18 +268,21 @@ impl Pike {
         }
     }
 
+    /// Move the cursor to the start of line if possible, else do nothing
     pub fn move_cursor_to_start_of_line(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to_start_of_line();
         }
     }
 
+    /// Move the cursor to the endf of line if possible, else do nothing
     pub fn move_cursor_to_end_of_line(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to_end_of_line();
         }
     }
 
+    /// Move the cursor left by one word if possible, else do nothing
     pub fn move_cursor_left_by_word(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
@@ -330,6 +333,7 @@ impl Pike {
         }
     }
 
+    /// Move the cursor right by one word if possible, else do nothing
     pub fn move_cursor_right_by_word(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
@@ -388,6 +392,7 @@ impl Pike {
         }
     }
 
+    /// Move the cursor to a specific position
     pub fn move_cursor_to(&mut self, pos: BufferPosition) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to(pos);
@@ -463,6 +468,7 @@ impl Pike {
         }
     }
 
+    /// Check if the current buffer has been modified
     pub fn is_current_buffer_modified(&self) -> bool {
         match self.current_buffer() {
             Some(buffer) => buffer.modified(),

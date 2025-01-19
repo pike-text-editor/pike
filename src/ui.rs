@@ -154,18 +154,21 @@ impl UIState {
         (area.x, area.y)
     }
 
+    /// Update the state of the buffer with the given highlights
     pub fn update_highlights(&mut self, highlights: Vec<Highlight>) {
         self.buffer_state.highlight_state.highlights = highlights;
         let focused_highlight = self.buffer_state.highlight_state.focused;
         self.buffer_state.highlight_state.highlights[focused_highlight].is_selected = true;
     }
 
+    /// Get the position of the currently focused highlight
     pub fn focused_highlight_position(&mut self) -> BufferPosition {
         let focused_highlight = self.buffer_state.highlight_state.focused;
         let highlight = &self.buffer_state.highlight_state.highlights[focused_highlight];
         highlight.start
     }
 
+    /// Change the focus to the next highlight
     pub fn focus_next_highlight(&mut self) {
         let highlights = &mut self.buffer_state.highlight_state.highlights;
         let currently_focused = self.buffer_state.highlight_state.focused;
@@ -178,6 +181,7 @@ impl UIState {
         self.buffer_state.highlight_state.focused = next_highlight;
     }
 
+    /// Change the focus to the previous highlight
     pub fn focus_prev_highlight(&mut self) {
         let highlights = &mut self.buffer_state.highlight_state.highlights;
         let currently_focused = self.buffer_state.highlight_state.focused;
@@ -190,6 +194,7 @@ impl UIState {
         self.buffer_state.highlight_state.focused = prev_highlight;
     }
 
+    /// Clear all highlights from the buffer
     pub fn clear_highlights(&mut self) {
         self.buffer_state.highlight_state.highlights.clear();
         self.buffer_state.highlight_state.focused = 0;
@@ -237,6 +242,7 @@ impl BufferDisplayState {
             highlight_state: HighlightState::default(),
         }
     }
+
     /// Updates the x offset of the buffer so that the cursor is always visible
     pub fn update_x_offset(&mut self, area: Rect, cursor_offset_x: usize) {
         let too_far_right = cursor_offset_x as u16 >= self.offset.x as u16 + area.width;
@@ -250,6 +256,7 @@ impl BufferDisplayState {
         self.offset.x = self.offset.x.min(cursor_offset_x);
     }
 
+    /// Updates the y offset of the buffer so that the cursor is always visible
     pub fn update_y_offset(&mut self, area: Rect, cursor_line: usize) {
         let too_far_down = cursor_line as u16 >= self.offset.y as u16 + area.height;
         if too_far_down {
@@ -286,10 +293,14 @@ impl BufferDisplayState {
             .join("\n")
     }
 
+    /// Shifts the contents of the buffer down and to the right by the offset and returns the
+    /// resulting string.
     fn shift_contents(&mut self, contents: String) -> String {
         let down_shifted = self.shift_contents_down(contents);
         self.shift_contents_right(down_shifted)
     }
+
+    /// Adds highlights to the given contents and returns a Text widget with the highlights applied.
     pub fn add_highlights<'a>(&self, contents: &'a str, highlights: &[Highlight]) -> Text<'a> {
         let mut highlighted_content = vec![];
         let contents_to_lines = contents.lines().collect::<Vec<&str>>();
@@ -340,6 +351,7 @@ impl BufferDisplayState {
         Text::from(highlighted_content)
     }
 
+    /// Prepares a paragraph widget with the given contents, applying highlights if present.
     fn prepare_paragraph_widget<'a>(&mut self, contents: &'a str) -> Paragraph<'a> {
         let paragraph_widget = if !self.highlight_state.highlights.is_empty() {
             let text_widget = self.add_highlights(contents, &self.highlight_state.highlights);
