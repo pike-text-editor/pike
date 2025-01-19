@@ -31,16 +31,22 @@ pub struct App {
 #[allow(dead_code, unused_variables, unused_mut)]
 impl App {
     pub fn build(args: Args) -> App {
-        let cwd = env::current_dir().map_err(|_| "Failed to get current working directory");
+        let mut cwd = env::current_dir().map_err(|_| "Failed to get current working directory");
         if cwd.is_err() {
             eprintln!("{}", cwd.err().unwrap());
             process::exit(1);
         }
 
         let config_path = args.config.map(PathBuf::from);
-        let file_path = args.file.map(PathBuf::from);
+        let mut file_path = args.file.map(PathBuf::from);
         let no_file_open = file_path.is_none();
 
+        if let Some(path) = &file_path {
+            if path.is_dir() {
+                env::set_current_dir(path).expect("Failed to change current working directory");
+                file_path = None;
+            }
+        }
         let backend: Result<Pike, String> =
             Pike::build(cwd.expect("Error case was handled"), file_path, config_path);
 
@@ -947,5 +953,13 @@ mod tests {
         app.handle_key_event(event)
             .expect("Failed to handle key event");
         assert_eq!(app.backend.current_buffer_contents(), "");
+    }
+
+    #[test]
+    fn test_app_opens_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_str().unwrap().to_string();
+        let _app = app_with_file(dir_path.clone());
+        assert_eq!(std::env::current_dir().unwrap().to_str().unwrap(), dir_path);
     }
 }

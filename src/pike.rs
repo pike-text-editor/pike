@@ -508,7 +508,7 @@ impl Pike {
     }
 
     /// Returns the current working directory as a pathbuf
-    fn cwd(&self) -> PathBuf {
+    pub fn cwd(&self) -> PathBuf {
         self.workspace.path.clone()
     }
 
