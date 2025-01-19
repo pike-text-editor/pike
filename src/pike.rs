@@ -25,6 +25,13 @@ impl CursorHistory {
     }
 }
 
+#[derive(Default)]
+pub struct Highlight {
+    pub start: BufferPosition,
+    pub length: usize,
+    pub is_selected: bool,
+}
+
 /// Backend of the app
 #[allow(dead_code, unused_variables, unused_mut)]
 pub struct Pike {
@@ -67,11 +74,7 @@ impl Pike {
             workspace
                 .open_buffer(cwf.as_path())
                 .map_err(|_| "Error opening file")?;
-        } else {
-            // Open an empty buffer with no path
-            workspace.add_buffer(Buffer::new());
         }
-
         Ok(Pike {
             workspace,
             config: Config::from_file(config_file.as_deref())
@@ -211,8 +214,11 @@ impl Pike {
     /// Returns the filename of the current buffer or an empty string
     pub fn current_buffer_filename(&self) -> String {
         match self.current_buffer_path() {
-            // TODO: check this goofy ahh chain
-            Some(path) => path.file_name().unwrap().to_str().unwrap().to_string(),
+            Some(path) => path
+                .file_name()
+                .and_then(|file_name| file_name.to_str())
+                .map(|s| s.to_string())
+                .expect("Failed to convert filename to string"),
             None => String::from(""),
         }
     }
@@ -261,18 +267,21 @@ impl Pike {
         }
     }
 
+    /// Move the cursor to the start of line if possible, else do nothing
     pub fn move_cursor_to_start_of_line(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to_start_of_line();
         }
     }
 
+    /// Move the cursor to the endf of line if possible, else do nothing
     pub fn move_cursor_to_end_of_line(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to_end_of_line();
         }
     }
 
+    /// Move the cursor left by one word if possible, else do nothing
     pub fn move_cursor_left_by_word(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
@@ -323,6 +332,7 @@ impl Pike {
         }
     }
 
+    /// Move the cursor right by one word if possible, else do nothing
     pub fn move_cursor_right_by_word(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
@@ -381,6 +391,7 @@ impl Pike {
         }
     }
 
+    /// Move the cursor to a specific position
     pub fn move_cursor_to(&mut self, pos: BufferPosition) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to(pos);
@@ -422,13 +433,21 @@ impl Pike {
 
     /// Search for a query in the current buffer and return
     /// the results in the form of a vec of offsets
-    fn search_in_current_buffer(&mut self, query: &str) -> Vec<usize> {
-        todo!()
-    }
-
-    /// Replace all occurences of query with replacement in the current buffer
-    fn replace_in_current_buffer(&mut self, query: &str, replacement: &str) {
-        todo!()
+    pub fn search_in_current_buffer(&mut self, query: &str) -> Result<Vec<Highlight>, String> {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            let results = buf
+                .search(query)
+                .into_iter()
+                .map(|pos| Highlight {
+                    start: pos,
+                    length: query.len(),
+                    is_selected: false,
+                })
+                .collect();
+            Ok(results)
+        } else {
+            Err("No buffer is currently open".to_string())
+        }
     }
 
     /// Save the current buffer to its file
@@ -443,6 +462,7 @@ impl Pike {
         }
     }
 
+    /// Check if the current buffer has been modified
     pub fn is_current_buffer_modified(&self) -> bool {
         match self.current_buffer() {
             Some(buffer) => buffer.modified(),
@@ -551,11 +571,7 @@ mod pike_test {
         let (pike, cwd) = tmp_pike_and_working_dir(None, None);
 
         assert_eq!(pike.workspace.path, cwd);
-        assert!(pike
-            .current_buffer()
-            .expect("A buffer should open by default")
-            .path
-            .is_none());
+        assert!(pike.current_buffer().is_none());
         assert!(pike.config == Config::default());
     }
 
@@ -673,8 +689,9 @@ mod pike_test {
     }
 
     #[test]
-    fn test_write_to_default_buffer() {
+    fn test_write_to_unbound_buffer() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         let result = pike.write_to_current_buffer("Hello, world!");
         assert!(result.is_ok());
         assert_eq!(pike.current_buffer_contents(), "Hello, world!");
@@ -700,6 +717,7 @@ mod pike_test {
     #[should_panic]
     fn test_save_buffer_no_path() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         // This situation should not happen as it's handled in the UI, so a panic here
         // is expected
         let _ = pike.save_current_buffer();
@@ -765,9 +783,9 @@ mod pike_test {
     }
 
     #[test]
-    fn test_has_unsaved_changes_no_buffer() {
-        let pike = tmp_pike_and_working_dir(None, None).0;
-
+    fn test_has_unsaved_changes_new_buffer() {
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         assert!(pike.has_unsaved_changes());
     }
 
@@ -1004,11 +1022,10 @@ mod pike_test {
     fn test_open_new_buffer() {
         let file = temp_file_with_contents("Hello, world!");
         let (mut pike, _) = tmp_pike_and_working_dir(None, None);
-        assert_eq!(pike.workspace.buffer_paths().len(), 1);
 
         pike.open_file(file.path(), 0, 0)
             .expect("Failed to open file");
-        assert_eq!(pike.workspace.buffer_paths().len(), 2);
+        assert_eq!(pike.workspace.buffer_paths().len(), 1);
 
         // Should be empty with no path
         pike.open_new_buffer();
@@ -1018,7 +1035,7 @@ mod pike_test {
             .expect("A buffer should be open")
             .path
             .is_none());
-        assert_eq!(pike.workspace.buffer_paths().len(), 3);
+        assert_eq!(pike.workspace.buffer_paths().len(), 2);
     }
 
     #[test]
@@ -1026,6 +1043,7 @@ mod pike_test {
         let file_contents = "Hello, world!";
         let (mut pike, dir) = tmp_pike_and_working_dir(None, None);
         assert!(pike.current_buffer_path().is_none());
+        pike.open_new_buffer();
         pike.write_to_current_buffer(file_contents)
             .expect("Failed to write to current buffer");
 
@@ -1142,5 +1160,19 @@ mod pike_test {
                 offset: 14
             })
         );
+    }
+
+    #[test]
+    fn test_search_in_current_buffer() {
+        let file_contents = "Hello, world!";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(file_contents));
+
+        let results = pike
+            .search_in_current_buffer("world")
+            .expect("No buffer is currently open");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].start, Position { line: 0, offset: 7 });
+        assert_eq!(results[0].length, 5);
     }
 }
