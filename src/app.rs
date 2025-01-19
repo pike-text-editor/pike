@@ -155,10 +155,7 @@ impl App {
     fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         // Display a welcome message if no buffer is open
         if self.backend.current_buffer().is_none() {
-            let banner = WELCOME_MESSAGE;
-            let paragraph = Paragraph::new(banner).block(Block::default().borders(Borders::NONE));
-            paragraph.render(area, buf);
-            return;
+            self.render_welcome_banner(area, buf);
         }
 
         let contents = self.backend.current_buffer_contents();
@@ -166,6 +163,12 @@ impl App {
 
         let widget = BufferDisplayWidget::new(&contents, cursor);
         widget.render(area, buf, &mut self.ui_state.buffer_state);
+    }
+
+    fn render_welcome_banner(&self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
+        let banner = WELCOME_MESSAGE;
+        let paragraph = Paragraph::new(banner).block(Block::default().borders(Borders::NONE));
+        paragraph.render(area, buf);
     }
 
     /// Render the status bar in a given Rect
