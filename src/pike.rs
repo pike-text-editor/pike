@@ -9,8 +9,6 @@ use scribe::buffer::Position as BufferPosition;
 use scribe::{Buffer, Workspace};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::welcome_pike::WELCOME_MESSAGE;
-
 /// Cursor history
 #[derive(Default)]
 struct CursorHistory {
@@ -40,7 +38,6 @@ pub struct Pike {
     workspace: Workspace,
     config: Config,
     cursor_history: CursorHistory,
-    welcome_message: Option<String>,
 }
 
 #[allow(dead_code, unused_variables, unused_mut)]
@@ -50,7 +47,6 @@ impl Pike {
         cwd: PathBuf,
         cwf: Option<PathBuf>,
         mut config_file: Option<PathBuf>,
-        no_file_start: bool,
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
         if config_file.is_none() {
@@ -65,8 +61,6 @@ impl Pike {
         let mut workspace =
             Workspace::new(&cwd, None).map_err(|e| format!("Error creating workspace: {}", e))?;
 
-        let mut welcome_message = None;
-
         if let Some(cwf) = cwf {
             // Check if file exits, if not, create it
             if !cwf.exists() {
@@ -80,34 +74,19 @@ impl Pike {
             workspace
                 .open_buffer(cwf.as_path())
                 .map_err(|_| "Error opening file")?;
-        } else if !no_file_start {
-            // Open an empty buffer with no path
-            workspace.add_buffer(Buffer::new());
-        } else {
-            welcome_message = Some(WELCOME_MESSAGE.to_string());
         }
-
         Ok(Pike {
             workspace,
             config: Config::from_file(config_file.as_deref())
                 .map_err(|e| format!("Error loading config: {}", e))?,
             cursor_history: CursorHistory::default(),
-            welcome_message,
         })
-    }
-
-    /// Return welcome message for UI
-    pub fn welcome_message(&self) -> Option<&str> {
-        self.welcome_message.as_deref()
     }
 
     /// Open a file, move its contents into the current buffer
     /// and set the cursor to the offset. If the offset is out of bounds,
     /// the cursor will remain at the start of the file.
     pub fn open_file(&mut self, path: &Path, line: usize, offset: usize) -> Result<(), String> {
-        // Once we want to open a file, we should clear the welcome message
-        self.welcome_message = None;
-
         self.workspace
             .open_buffer(path)
             .map_err(|_| "Error opening file".to_string())?;
@@ -124,9 +103,6 @@ impl Pike {
 
     /// Create a file if if does not exists and open it
     pub fn create_and_open_file(&mut self, path: &Path) -> Result<(), String> {
-        // Once we want to open a file, we should clear the welcome message
-        self.welcome_message = None;
-
         if !path.exists() {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)
@@ -434,7 +410,6 @@ impl Pike {
 
     /// Create a new empty buffer not bound to a path and set it as the current buffer
     pub fn open_new_buffer(&mut self) {
-        self.welcome_message = None;
         let buf = Buffer::new();
         self.workspace.add_buffer(buf);
     }
@@ -580,7 +555,7 @@ mod pike_test {
         let config_path = config_file.as_ref().map(|f| f.path().to_path_buf());
 
         (
-            Pike::build(cwd.clone(), cwf_path, config_path, false).expect("Failed to build Pike"),
+            Pike::build(cwd.clone(), cwf_path, config_path).expect("Failed to build Pike"),
             cwd,
         )
     }
@@ -598,11 +573,7 @@ mod pike_test {
         let (pike, cwd) = tmp_pike_and_working_dir(None, None);
 
         assert_eq!(pike.workspace.path, cwd);
-        assert!(pike
-            .current_buffer()
-            .expect("A buffer should open by default")
-            .path
-            .is_none());
+        assert!(pike.current_buffer().is_none());
         assert!(pike.config == Config::default());
     }
 
@@ -720,8 +691,9 @@ mod pike_test {
     }
 
     #[test]
-    fn test_write_to_default_buffer() {
+    fn test_write_to_unbound_buffer() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         let result = pike.write_to_current_buffer("Hello, world!");
         assert!(result.is_ok());
         assert_eq!(pike.current_buffer_contents(), "Hello, world!");
@@ -747,6 +719,7 @@ mod pike_test {
     #[should_panic]
     fn test_save_buffer_no_path() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         // This situation should not happen as it's handled in the UI, so a panic here
         // is expected
         let _ = pike.save_current_buffer();
@@ -812,9 +785,9 @@ mod pike_test {
     }
 
     #[test]
-    fn test_has_unsaved_changes_no_buffer() {
-        let pike = tmp_pike_and_working_dir(None, None).0;
-
+    fn test_has_unsaved_changes_new_buffer() {
+        let mut pike = tmp_pike_and_working_dir(None, None).0;
+        pike.open_new_buffer();
         assert!(pike.has_unsaved_changes());
     }
 
@@ -1051,11 +1024,10 @@ mod pike_test {
     fn test_open_new_buffer() {
         let file = temp_file_with_contents("Hello, world!");
         let (mut pike, _) = tmp_pike_and_working_dir(None, None);
-        assert_eq!(pike.workspace.buffer_paths().len(), 1);
 
         pike.open_file(file.path(), 0, 0)
             .expect("Failed to open file");
-        assert_eq!(pike.workspace.buffer_paths().len(), 2);
+        assert_eq!(pike.workspace.buffer_paths().len(), 1);
 
         // Should be empty with no path
         pike.open_new_buffer();
@@ -1065,7 +1037,7 @@ mod pike_test {
             .expect("A buffer should be open")
             .path
             .is_none());
-        assert_eq!(pike.workspace.buffer_paths().len(), 3);
+        assert_eq!(pike.workspace.buffer_paths().len(), 2);
     }
 
     #[test]
@@ -1073,6 +1045,7 @@ mod pike_test {
         let file_contents = "Hello, world!";
         let (mut pike, dir) = tmp_pike_and_working_dir(None, None);
         assert!(pike.current_buffer_path().is_none());
+        pike.open_new_buffer();
         pike.write_to_current_buffer(file_contents)
             .expect("Failed to write to current buffer");
 

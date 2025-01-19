@@ -17,6 +17,7 @@ use crate::{
         BufferDisplayOffset, BufferDisplayState, BufferDisplayWidget, CursorCalculationMode,
         FileInput, FileInputRole, SearchInput, UIState,
     },
+    welcome_pike::WELCOME_MESSAGE,
 };
 
 /// TUI application which displays the UI and handles events
@@ -38,14 +39,10 @@ impl App {
 
         let config_path = args.config.map(PathBuf::from);
         let file_path = args.file.map(PathBuf::from);
-        let no_file_start = file_path.is_none();
+        let no_file_open = file_path.is_none();
 
-        let backend: Result<Pike, String> = Pike::build(
-            cwd.expect("Error case was handled"),
-            file_path,
-            config_path,
-            no_file_start,
-        );
+        let backend: Result<Pike, String> =
+            Pike::build(cwd.expect("Error case was handled"), file_path, config_path);
 
         match backend {
             Ok(backend) => App::new(backend),
@@ -158,10 +155,9 @@ impl App {
     fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         // Display a welcome message if no buffer is open
         if self.backend.current_buffer().is_none() {
-            if let Some(msg) = self.backend.welcome_message() {
-                let paragraph = Paragraph::new(msg).block(Block::default().borders(Borders::NONE));
-                paragraph.render(area, buf);
-            };
+            let banner = WELCOME_MESSAGE;
+            let paragraph = Paragraph::new(banner).block(Block::default().borders(Borders::NONE));
+            paragraph.render(area, buf);
             return;
         }
 
