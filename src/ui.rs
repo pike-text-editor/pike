@@ -1,13 +1,16 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Position as TerminalPosition, Rect},
-    text::{Text, ToText},
+    style::{Color, Modifier, Style},
+    text::{Line, Span, Text, ToText},
     widgets::{self, Paragraph, StatefulWidget, Widget},
 };
 use scribe::buffer::Position as BufferPosition;
 use std::rc::Rc;
 use std::{cmp::min, path::PathBuf};
 use tui_input::{Input, InputRequest};
+
+use crate::pike::Highlight;
 
 /// We would like to have some struct which can be rendered
 /// as a list with given callbacks to be executed when something is
@@ -18,6 +21,9 @@ use tui_input::{Input, InputRequest};
 /// behave, so it's empty
 #[allow(dead_code)]
 struct Picker {}
+
+const HIGHLIGHT_BG_SELECTED: Color = Color::Rgb(245, 206, 88);
+const HIGHLIGHT_BG_UNSELECTED: Color = Color::Rgb(240, 137, 48);
 
 pub enum CursorCalculationMode<'a> {
     FileInput(&'a Input),
@@ -68,6 +74,7 @@ pub struct UIState {
     /// A text input used to enter the filepath when saving an unbound buffer
     /// and opening a new file
     pub file_input: Option<FileInputState>,
+    pub search_input: Option<Input>,
 }
 
 impl UIState {
@@ -146,6 +153,52 @@ impl UIState {
     fn base_rect_position(area: &Rect) -> (u16, u16) {
         (area.x, area.y)
     }
+
+    /// Update the state of the buffer with the given highlights
+    pub fn update_highlights(&mut self, highlights: Vec<Highlight>) {
+        self.buffer_state.highlight_state.highlights = highlights;
+        let focused_highlight = self.buffer_state.highlight_state.focused;
+        self.buffer_state.highlight_state.highlights[focused_highlight].is_selected = true;
+    }
+
+    /// Get the position of the currently focused highlight
+    pub fn focused_highlight_position(&mut self) -> BufferPosition {
+        let focused_highlight = self.buffer_state.highlight_state.focused;
+        let highlight = &self.buffer_state.highlight_state.highlights[focused_highlight];
+        highlight.start
+    }
+
+    /// Change the focus to the next highlight
+    pub fn focus_next_highlight(&mut self) {
+        let highlights = &mut self.buffer_state.highlight_state.highlights;
+        let currently_focused = self.buffer_state.highlight_state.focused;
+        let n_of_highlights = highlights.len();
+
+        highlights[currently_focused].is_selected = false;
+
+        let next_highlight = currently_focused.wrapping_add(1) % n_of_highlights;
+        highlights[next_highlight].is_selected = true;
+        self.buffer_state.highlight_state.focused = next_highlight;
+    }
+
+    /// Change the focus to the previous highlight
+    pub fn focus_prev_highlight(&mut self) {
+        let highlights = &mut self.buffer_state.highlight_state.highlights;
+        let currently_focused = self.buffer_state.highlight_state.focused;
+        let n_of_highlights = highlights.len();
+
+        highlights[currently_focused].is_selected = false;
+
+        let prev_highlight = currently_focused.wrapping_sub(1) % n_of_highlights;
+        highlights[prev_highlight].is_selected = true;
+        self.buffer_state.highlight_state.focused = prev_highlight;
+    }
+
+    /// Clear all highlights from the buffer
+    pub fn clear_highlights(&mut self) {
+        self.buffer_state.highlight_state.highlights.clear();
+        self.buffer_state.highlight_state.focused = 0;
+    }
 }
 
 /// Holds the information how much offset is the
@@ -168,18 +221,28 @@ impl BufferDisplayOffset {
         BufferDisplayOffset { x, y }
     }
 }
+#[derive(Default)]
+pub struct HighlightState {
+    pub highlights: Vec<Highlight>,
+    pub focused: usize,
+}
 
 #[derive(Default)]
 /// Represents the state of a buffer display, including its contents, cursor position, and offset.
 pub struct BufferDisplayState {
     pub offset: BufferDisplayOffset,
+    pub highlight_state: HighlightState,
 }
 
 #[allow(dead_code)]
 impl BufferDisplayState {
     pub fn new(offset: BufferDisplayOffset) -> Self {
-        BufferDisplayState { offset }
+        BufferDisplayState {
+            offset,
+            highlight_state: HighlightState::default(),
+        }
     }
+
     /// Updates the x offset of the buffer so that the cursor is always visible
     pub fn update_x_offset(&mut self, area: Rect, cursor_offset_x: usize) {
         let too_far_right = cursor_offset_x as u16 >= self.offset.x as u16 + area.width;
@@ -193,6 +256,7 @@ impl BufferDisplayState {
         self.offset.x = self.offset.x.min(cursor_offset_x);
     }
 
+    /// Updates the y offset of the buffer so that the cursor is always visible
     pub fn update_y_offset(&mut self, area: Rect, cursor_line: usize) {
         let too_far_down = cursor_line as u16 >= self.offset.y as u16 + area.height;
         if too_far_down {
@@ -229,9 +293,74 @@ impl BufferDisplayState {
             .join("\n")
     }
 
+    /// Shifts the contents of the buffer down and to the right by the offset and returns the
+    /// resulting string.
     fn shift_contents(&mut self, contents: String) -> String {
         let down_shifted = self.shift_contents_down(contents);
         self.shift_contents_right(down_shifted)
+    }
+
+    /// Adds highlights to the given contents and returns a Text widget with the highlights applied.
+    pub fn add_highlights<'a>(&self, contents: &'a str, highlights: &[Highlight]) -> Text<'a> {
+        let mut highlighted_content = vec![];
+        let contents_to_lines = contents.lines().collect::<Vec<&str>>();
+
+        for (line_index, line_text) in contents_to_lines.iter().enumerate() {
+            let mut line = Vec::new();
+            let mut current_pos = 0;
+
+            // Find all highlights in this line, considering the offset
+            for highlight in highlights
+                .iter()
+                .filter(|h| h.start.line == line_index + self.offset.y)
+            {
+                let highlight_start = highlight.start.offset.saturating_sub(self.offset.x);
+                let highlight_end = (highlight_start + highlight.length).min(line_text.len());
+
+                if highlight_start > current_pos {
+                    // Add unhighlighted text before the highlight
+                    line.push(Span::raw(&line_text[current_pos..highlight_start]));
+                }
+
+                let highlight_bg = if highlight.is_selected {
+                    HIGHLIGHT_BG_SELECTED
+                } else {
+                    HIGHLIGHT_BG_UNSELECTED
+                };
+
+                // Add highlighted text
+                line.push(Span::styled(
+                    &line_text[highlight_start..highlight_end],
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(highlight_bg)
+                        .add_modifier(Modifier::BOLD),
+                ));
+
+                current_pos = highlight_end;
+            }
+
+            // Add the remaining unhighlighted text
+            if current_pos < line_text.len() {
+                line.push(Span::raw(&line_text[current_pos..]));
+            }
+
+            highlighted_content.push(Line::from(line));
+        }
+
+        Text::from(highlighted_content)
+    }
+
+    /// Prepares a paragraph widget with the given contents, applying highlights if present.
+    fn prepare_paragraph_widget<'a>(&mut self, contents: &'a str) -> Paragraph<'a> {
+        let paragraph_widget = if !self.highlight_state.highlights.is_empty() {
+            let text_widget = self.add_highlights(contents, &self.highlight_state.highlights);
+            Paragraph::new(text_widget)
+        } else {
+            let text_widget = Text::from(contents);
+            Paragraph::new(text_widget)
+        };
+        paragraph_widget
     }
 }
 
@@ -269,9 +398,8 @@ impl StatefulWidget for BufferDisplayWidget<'_> {
         // Shift contents based on offset
         let shifted_contents = state.shift_contents(self.buffer_contents.to_string());
         // Render the text using Paragraph
-        let text_widget = Text::from(shifted_contents);
-        let paragraph_widget = Paragraph::new(text_widget);
 
+        let paragraph_widget = state.prepare_paragraph_widget(&shifted_contents);
         paragraph_widget.render(area, buf);
     }
 }
@@ -296,15 +424,34 @@ impl StatefulWidget for FileInput {
     }
 }
 
+#[derive(Default)]
+pub struct SearchInput {}
+
+impl StatefulWidget for SearchInput {
+    type State = Input;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let widget = widgets::Paragraph::new(state.to_text()).block(
+            widgets::Block::new()
+                .borders(widgets::Borders::all())
+                .title("Search for: "),
+        );
+        widget.render(area, buf)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
-    use tui_input::InputRequest;
-
     use crate::{
         test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border},
-        ui::{FileInputRole, FileInputState},
+        ui::{BufferDisplayState, FileInputRole, FileInputState},
     };
+    use ratatui::style::{Color, Modifier, Style};
+    use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
+    use scribe::buffer::Position as BufferPosition;
+    use tui_input::InputRequest;
+
+    use crate::pike::Highlight;
 
     use super::FileInput;
     // TODO: could move some BufferDisplay tests here for clarity
@@ -337,5 +484,151 @@ mod tests {
             text_line,
             vertical_border() + "hello," + &n_spaces(2) + &vertical_border()
         );
+    }
+
+    #[test]
+    fn test_add_highlights_single_line_unselected() {
+        // Setup a default display state with no offset.
+        let state = BufferDisplayState::default();
+
+        let content = "Hello world";
+        let highlight = Highlight {
+            start: BufferPosition { line: 0, offset: 6 },
+            length: 5,
+            is_selected: false,
+        };
+
+        let text = state.add_highlights(content, &[highlight]);
+
+        // Extract spans and styles from the resulting Text.
+        let lines: Vec<_> = text
+            .lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| (span.content.clone(), span.style))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        // We expect one line with two spans: unhighlighted "Hello " and highlighted "world".
+        assert_eq!(lines.len(), 1);
+        let spans = &lines[0];
+        assert_eq!(spans.len(), 2);
+
+        // First span: "Hello " with default style.
+        assert_eq!(spans[0].0, "Hello ");
+        assert_eq!(spans[0].1, Style::default());
+
+        // Second span: "world" with highlighted style.
+        let expected_style = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(240, 137, 48))
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(spans[1].0, "world");
+        assert_eq!(spans[1].1, expected_style);
+    }
+
+    #[test]
+    fn test_add_highlights_single_line_selected() {
+        // Test with a selected highlight which uses a different background color.
+        let state = BufferDisplayState::default();
+
+        let content = "Hello world";
+        let highlight = Highlight {
+            start: BufferPosition { line: 0, offset: 6 },
+            length: 5,
+            is_selected: true,
+        };
+
+        let text = state.add_highlights(content, &[highlight]);
+
+        let lines: Vec<_> = text
+            .lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| (span.content.clone(), span.style))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        assert_eq!(lines.len(), 1);
+        let spans = &lines[0];
+        assert_eq!(spans.len(), 2);
+
+        // First span: "Hello " with default style.
+        assert_eq!(spans[0].0, "Hello ");
+        assert_eq!(spans[0].1, Style::default());
+
+        // Second span: "world" with selected highlight style.
+        let expected_style = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(245, 206, 88)) // Selected color
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(spans[1].0, "world");
+        assert_eq!(spans[1].1, expected_style);
+    }
+
+    #[test]
+    fn test_add_highlights_multiple_lines_and_highlights() {
+        let state = BufferDisplayState::default();
+
+        let content = "Line one\nLine two\nLine three";
+        let highlights = vec![
+            Highlight {
+                start: BufferPosition { line: 0, offset: 5 },
+                length: 3,
+                is_selected: false,
+            },
+            Highlight {
+                start: BufferPosition { line: 1, offset: 5 },
+                length: 3,
+                is_selected: true,
+            },
+        ];
+
+        let text = state.add_highlights(content, &highlights);
+
+        let lines: Vec<_> = text
+            .lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| (span.content.clone(), span.style))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        // Check first line spans.
+        // "Line one" with a highlight on "one"
+        assert!(lines.len() >= 2);
+        let first_line = &lines[0];
+        // Expected spans for first line: ["Line ", highlighted("one")]
+        assert_eq!(first_line.len(), 2);
+        assert_eq!(first_line[0].0, "Line ");
+        assert_eq!(first_line[0].1, Style::default());
+        let expected_style_first = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(240, 137, 48))
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(first_line[1].0, "one");
+        assert_eq!(first_line[1].1, expected_style_first);
+
+        // Check second line spans.
+        // "Line two" with a selected highlight on "two"
+        let second_line = &lines[1];
+        assert_eq!(second_line.len(), 2);
+        assert_eq!(second_line[0].0, "Line ");
+        assert_eq!(second_line[0].1, Style::default());
+        let expected_style_second = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Rgb(245, 206, 88)) // Selected highlight color
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(second_line[1].0, "two");
+        assert_eq!(second_line[1].1, expected_style_second);
     }
 }

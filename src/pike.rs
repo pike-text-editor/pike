@@ -25,6 +25,13 @@ impl CursorHistory {
     }
 }
 
+#[derive(Default)]
+pub struct Highlight {
+    pub start: BufferPosition,
+    pub length: usize,
+    pub is_selected: bool,
+}
+
 /// Backend of the app
 #[allow(dead_code, unused_variables, unused_mut)]
 pub struct Pike {
@@ -261,18 +268,21 @@ impl Pike {
         }
     }
 
+    /// Move the cursor to the start of line if possible, else do nothing
     pub fn move_cursor_to_start_of_line(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to_start_of_line();
         }
     }
 
+    /// Move the cursor to the endf of line if possible, else do nothing
     pub fn move_cursor_to_end_of_line(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to_end_of_line();
         }
     }
 
+    /// Move the cursor left by one word if possible, else do nothing
     pub fn move_cursor_left_by_word(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
@@ -323,6 +333,7 @@ impl Pike {
         }
     }
 
+    /// Move the cursor right by one word if possible, else do nothing
     pub fn move_cursor_right_by_word(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
@@ -381,6 +392,7 @@ impl Pike {
         }
     }
 
+    /// Move the cursor to a specific position
     pub fn move_cursor_to(&mut self, pos: BufferPosition) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             buffer.cursor.move_to(pos);
@@ -422,8 +434,21 @@ impl Pike {
 
     /// Search for a query in the current buffer and return
     /// the results in the form of a vec of offsets
-    fn search_in_current_buffer(&mut self, query: &str) -> Vec<usize> {
-        todo!()
+    pub fn search_in_current_buffer(&mut self, query: &str) -> Result<Vec<Highlight>, String> {
+        if let Some(buf) = self.workspace.current_buffer.as_mut() {
+            let results = buf
+                .search(query)
+                .into_iter()
+                .map(|pos| Highlight {
+                    start: pos,
+                    length: query.len(),
+                    is_selected: false,
+                })
+                .collect();
+            Ok(results)
+        } else {
+            Err("No buffer is currently open".to_string())
+        }
     }
 
     /// Replace all occurences of query with replacement in the current buffer
@@ -443,6 +468,7 @@ impl Pike {
         }
     }
 
+    /// Check if the current buffer has been modified
     pub fn is_current_buffer_modified(&self) -> bool {
         match self.current_buffer() {
             Some(buffer) => buffer.modified(),
@@ -1142,5 +1168,19 @@ mod pike_test {
                 offset: 14
             })
         );
+    }
+
+    #[test]
+    fn test_search_in_current_buffer() {
+        let file_contents = "Hello, world!";
+        let (mut pike, _) = tmp_pike_and_working_dir(None, Some(file_contents));
+
+        let results = pike
+            .search_in_current_buffer("world")
+            .expect("No buffer is currently open");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].start, Position { line: 0, offset: 7 });
+        assert_eq!(results[0].length, 5);
     }
 }

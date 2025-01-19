@@ -15,7 +15,7 @@ use crate::{
     pike::Pike,
     ui::{
         BufferDisplayOffset, BufferDisplayState, BufferDisplayWidget, CursorCalculationMode,
-        FileInput, FileInputRole, UIState,
+        FileInput, FileInputRole, SearchInput, UIState,
     },
 };
 
@@ -55,9 +55,11 @@ impl App {
         let offset = BufferDisplayOffset::default();
         let buffer_state = BufferDisplayState::new(offset);
         let file_input = None;
+        let search_input = None;
         let ui_state = UIState {
             buffer_state,
             file_input,
+            search_input,
         };
 
         App {
@@ -99,11 +101,19 @@ impl App {
         self.render_buffer_contents(main_area, frame.buffer_mut());
 
         let file_input_value = self.ui_state.file_input.clone();
+        let search_input_value = self.ui_state.search_input.clone();
 
         if let Some(ref input_state) = file_input_value {
             self.render_file_input(status_bar_area, frame.buffer_mut());
             render_cursor_position = self.ui_state.calculate_cursor_position(
                 CursorCalculationMode::FileInput(&input_state.input),
+                &layout,
+                cursor_pos,
+            );
+        } else if let Some(ref search_input) = search_input_value {
+            self.render_search_input(status_bar_area, frame.buffer_mut());
+            render_cursor_position = self.ui_state.calculate_cursor_position(
+                CursorCalculationMode::FileInput(search_input),
                 &layout,
                 cursor_pos,
             );
@@ -123,10 +133,15 @@ impl App {
     /// resulting areas
     pub fn split_area(&self, area: Rect) -> Rc<[Rect]> {
         let file_input_open = self.ui_state.file_input.is_some();
+        let search_input_open = self.ui_state.search_input.is_some();
 
         // if a file input is rendered in the status bar, an additional border
         // is rendered
-        let status_bar_height = if file_input_open { 3 } else { 2 };
+        let status_bar_height = if file_input_open || search_input_open {
+            3
+        } else {
+            2
+        };
 
         Layout::default()
             .direction(Direction::Vertical)
@@ -172,6 +187,26 @@ impl App {
                 .as_mut()
                 .expect("None case was handled"),
         );
+    }
+
+    /// Render the search input in a given Rect
+    fn render_search_input(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
+        SearchInput::default().render(
+            area,
+            buf,
+            self.ui_state
+                .search_input
+                .as_mut()
+                .expect("None case was handled"),
+        );
+    }
+
+    fn open_search_input(&mut self, contents: &str) {
+        self.ui_state.search_input = Some(contents.into());
+    }
+
+    fn close_search_input(&mut self) {
+        self.ui_state.search_input = None;
     }
 
     /// Open a file input with the given contents and store it in UIState
@@ -249,6 +284,82 @@ impl App {
         }
     }
 
+    /// Try to handle key input when search input is open.
+    /// Handles searching, toggling through found items, and quitting.
+    /// Returns a boolean indicating whether the event has been handled or not.
+    fn try_handle_key_press_with_search_input(&mut self, key: KeyEvent) -> bool {
+        // No input means the event can't be handled
+        let input = match self.ui_state.search_input.as_mut() {
+            Some(input) => input,
+            None => return false,
+        };
+
+        // Perform the corresponding operation and close the input
+        if (key.code, key.modifiers) == (KeyCode::Enter, KeyModifiers::NONE) {
+            let query = input.to_string();
+            let highlights = self
+                .backend
+                .search_in_current_buffer(&query)
+                .unwrap_or_else(|err| {
+                    eprintln!("Error searching in buffer: {}", err);
+                    vec![]
+                });
+
+            if highlights.is_empty() {
+                self.ui_state.clear_highlights();
+                return true;
+            }
+            self.ui_state.update_highlights(highlights);
+            self.backend
+                .move_cursor_to(self.ui_state.focused_highlight_position());
+
+            return true;
+        }
+
+        if (key.code, key.modifiers) == (KeyCode::Right, KeyModifiers::NONE)
+            && !self
+                .ui_state
+                .buffer_state
+                .highlight_state
+                .highlights
+                .is_empty()
+        {
+            self.ui_state.focus_next_highlight();
+            self.backend
+                .move_cursor_to(self.ui_state.focused_highlight_position());
+            return true;
+        }
+
+        if (key.code, key.modifiers) == (KeyCode::Left, KeyModifiers::NONE)
+            && !self
+                .ui_state
+                .buffer_state
+                .highlight_state
+                .highlights
+                .is_empty()
+        {
+            self.ui_state.focus_prev_highlight();
+            return true;
+        }
+
+        // Close the input
+        if (key.code, key.modifiers) == (KeyCode::Esc, KeyModifiers::NONE) {
+            self.ui_state.clear_highlights();
+            self.close_search_input();
+            return true;
+        }
+
+        // Try to create a request to the file input and handle it
+        match Self::key_event_to_input_request(key) {
+            Some(request) => {
+                input.handle(request);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Open a file from a given path
     fn open_file_from_path(&mut self, path: PathBuf) {
         self.backend
             .create_and_open_file(&path)
@@ -278,6 +389,10 @@ impl App {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> Result<(), io::Error> {
         if self.try_handle_key_press_with_file_input(key) {
+            return Ok(());
+        }
+
+        if self.try_handle_key_press_with_search_input(key) {
             return Ok(());
         }
 
@@ -384,7 +499,12 @@ impl App {
             Operation::SwitchToPreviousBuffer => self.backend.previous_buffer(),
             Operation::SwitchToNextBuffer => self.backend.next_buffer(),
             Operation::SaveBufferToFile => self.handle_save_operation(),
-            Operation::SearchInCurrentBuffer => todo!("Handle SearchInCurrentBuffer operation"),
+
+            Operation::SearchInCurrentBuffer => self.open_search_input(""),
+            Operation::SearchAndReplaceInCurrentBuffer => {
+                todo!("Handle SearchAndReplaceInCurrentBuffer operation")
+            }
+
             Operation::Undo => self.backend.undo(),
             Operation::Redo => self.backend.redo(),
         }
