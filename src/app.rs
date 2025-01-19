@@ -501,9 +501,6 @@ impl App {
             Operation::SaveBufferToFile => self.handle_save_operation(),
 
             Operation::SearchInCurrentBuffer => self.open_search_input(""),
-            Operation::SearchAndReplaceInCurrentBuffer => {
-                todo!("Handle SearchAndReplaceInCurrentBuffer operation")
-            }
 
             Operation::Undo => self.backend.undo(),
             Operation::Redo => self.backend.redo(),
