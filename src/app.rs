@@ -246,11 +246,10 @@ impl App {
     }
 
     fn handle_key_event(&mut self, event: KeyEvent) -> Result<(), io::Error> {
-        match event.kind {
-            event::KeyEventKind::Press => self.handle_key_press(event),
-            event::KeyEventKind::Release => Ok(()),
-            event::KeyEventKind::Repeat => Ok(()),
+        if let event::KeyEventKind::Press = event.kind {
+            return self.handle_key_press(event);
         }
+        Ok(())
     }
 
     /// Try to handle the key press using a file input. Returns a boolean
@@ -537,8 +536,11 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
 
+    use std::io::Write;
+
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-    use ratatui::{buffer::Buffer, layout::Rect};
+    use insta::assert_snapshot;
+    use ratatui::{backend::TestBackend, buffer::Buffer, layout::Rect, Terminal};
     use tempfile::NamedTempFile;
     use tui_input::InputRequest;
 
@@ -554,10 +556,10 @@ mod tests {
     use super::App;
 
     /// Create an App instance with a given file open
-    fn app_with_file(filename: String) -> super::App {
+    fn app_with_file(filename: &str) -> super::App {
         App::build(super::Args {
             config: None,
-            file: Some(filename),
+            file: Some(filename.to_string()),
         })
     }
 
@@ -565,7 +567,7 @@ mod tests {
     fn app_with_file_contents(contents: &str) -> super::App {
         let file = temp_file_with_contents(contents);
         let filename = file.path().to_str().unwrap().to_string();
-        app_with_file(filename)
+        app_with_file(&filename)
     }
 
     /// Create an App instance with a given config
@@ -688,7 +690,7 @@ mod tests {
         let file = NamedTempFile::new().expect("Failed to create temporary file");
         let file_path = file.path().to_str().unwrap().to_string();
         let filename = file.path().file_name().unwrap().to_str().unwrap();
-        let app = app_with_file(file_path.clone());
+        let app = app_with_file(&file_path);
         let width = 20;
 
         let mut buf = Buffer::empty(Rect::new(0, 0, width, 2));
@@ -984,5 +986,224 @@ mod tests {
             event
         );
         acrp_based_on_current_buffer(&mut app, &buf, (0, 0));
+    }
+
+    #[test]
+    fn test_app_render_banner() {
+        let mut app = App::build_default();
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn test_app_render_empty_buffer() {
+        // a plain Tempfile won't do here as we want the path to be the same on every test launch
+        // to match the snapshot
+        let file_path = "/tmp/pike-test-render-empty-buffer.txt";
+        let mut app = app_with_file(file_path);
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn app_renders_buffer_contents() {
+        // a plain Tempfile won't do here as we want the path to be the same on every test launch
+        // to match the snapshot
+        let file_path = "/tmp/pike-test-render-buffer.txt";
+        let mut file = std::fs::File::create(file_path).unwrap();
+        let written = file.write("Hello, world!".as_bytes());
+        assert_eq!(written.unwrap(), 13);
+        let mut app = app_with_file(file_path);
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn app_render_file_input_after_handling_open_file_keybind() {
+        let mut app = App::build_default();
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+
+        app.handle_operation(&Operation::OpenFile);
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn app_render_with_search_input() {
+        let mut app = App::build_default();
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+
+        app.handle_operation(&Operation::SearchInCurrentBuffer);
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn app_render_search_results() {
+        // Color assertions are not yet supported, but let's keep it for the future reference
+        // and to bump test coverage;)
+        let file_path = "/tmp/pike-test-render-search-results.txt";
+        let mut file = std::fs::File::create(file_path).unwrap();
+        let written = file.write("Hello, world! Goodbye, world!".as_bytes());
+        assert_eq!(written.unwrap(), 29);
+
+        let mut app = app_with_file(file_path);
+
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+        app.handle_operation(&Operation::SearchInCurrentBuffer);
+        let wor_query_key_events = [
+            KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        ];
+
+        for event in wor_query_key_events.iter() {
+            app.handle_key_event(*event)
+                .expect("Failed to handle key event");
+        }
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn app_renders_no_search_input_after_closing() {
+        let mut app = App::build_default();
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+
+        app.handle_operation(&Operation::SearchInCurrentBuffer);
+        app.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))
+            .expect("Failed to handle key event");
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn app_renders_no_file_input_after_closing() {
+        let mut app = App::build_default();
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+
+        app.handle_operation(&Operation::OpenFile);
+        app.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))
+            .expect("Failed to handle key event");
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_snapshot!(terminal.backend());
+    }
+
+    #[test]
+    fn handle_events_with_file_input_write_and_close() {
+        let mut app = App::build_default();
+        let open_file_event = KeyEvent::new(KeyCode::Char('o'), KeyModifiers::CONTROL);
+        let close_event = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
+
+        app.handle_key_event(open_file_event)
+            .expect("Failed to handle key event");
+        assert!(app.ui_state.file_input.is_some());
+
+        app.handle_key_event(close_event)
+            .expect("Failed to handle key event");
+        assert!(app.ui_state.file_input.is_none());
+    }
+
+    #[test]
+    fn write_events_change_buffer_contents() {
+        let mut app = app_with_file_contents("");
+        let hello = [
+            KeyEvent::new(KeyCode::Char('H'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE),
+        ];
+
+        for event in hello.iter() {
+            app.handle_key_event(*event)
+                .expect("Failed to handle key event");
+        }
+
+        assert_eq!(app.backend.current_buffer_contents(), "Hello");
+    }
+
+    #[test]
+    fn clicking_backspace_removes_characters() {
+        let mut app = app_with_file_contents("Hello");
+        let backspace = KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE);
+
+        app.backend.move_cursor_right_by_word();
+        app.handle_key_event(backspace)
+            .expect("Failed to handle key event");
+
+        assert_eq!(app.backend.current_buffer_contents(), "Hell");
+    }
+
+    #[test]
+    fn app_handles_arrow_navigation() {
+        let mut app = app_with_file_contents("line1\nline2\nline3");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
+
+        let navigation_cases = vec![
+            (KeyEvent::new(KeyCode::Left, KeyModifiers::NONE), (0, 0)),
+            (KeyEvent::new(KeyCode::Right, KeyModifiers::NONE), (1, 0)),
+            (KeyEvent::new(KeyCode::Up, KeyModifiers::NONE), (1, 0)),
+            (KeyEvent::new(KeyCode::Down, KeyModifiers::NONE), (1, 1)),
+            (KeyEvent::new(KeyCode::End, KeyModifiers::NONE), (5, 1)),
+            (KeyEvent::new(KeyCode::Home, KeyModifiers::NONE), (0, 1)),
+        ];
+
+        for (event, expected_pos) in navigation_cases {
+            app.handle_key_event(event)
+                .expect("Failed to handle key event");
+            acrp_based_on_current_buffer(&mut app, &buf, expected_pos);
+        }
+    }
+
+    #[test]
+    fn app_handles_navigation_by_words() {
+        let mut app = app_with_file_contents("word1 and word2");
+        let buf = Buffer::empty(Rect::new(0, 0, 20, 1));
+
+        let navigation_cases = vec![
+            (KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL), (5, 0)),
+            (KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL), (9, 0)),
+            (
+                KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL),
+                (15, 0),
+            ),
+            (KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL), (10, 0)),
+            (KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL), (6, 0)),
+        ];
+
+        for (event, expected_pos) in navigation_cases {
+            app.handle_key_event(event)
+                .expect("Failed to handle key event");
+            acrp_based_on_current_buffer(&mut app, &buf, expected_pos);
+        }
+    }
+
+    #[test]
+    fn app_handles_up_down_navigation() {
+        let mut app = app_with_file_contents("line1\nline2\nline3");
+        let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
+
+        let navigation_cases = vec![
+            (KeyEvent::new(KeyCode::Up, KeyModifiers::NONE), (0, 0)),
+            (KeyEvent::new(KeyCode::Down, KeyModifiers::NONE), (0, 1)),
+            (KeyEvent::new(KeyCode::Down, KeyModifiers::NONE), (0, 2)),
+            (KeyEvent::new(KeyCode::Up, KeyModifiers::NONE), (0, 1)),
+            (KeyEvent::new(KeyCode::Down, KeyModifiers::NONE), (0, 2)),
+        ];
+
+        for (event, expected_pos) in navigation_cases {
+            assert!(app.try_handle_navigation(event));
+            acrp_based_on_current_buffer(&mut app, &buf, expected_pos);
+        }
     }
 }
