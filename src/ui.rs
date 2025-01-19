@@ -22,6 +22,9 @@ use crate::pike::Highlight;
 #[allow(dead_code)]
 struct Picker {}
 
+const HIGHLIGHT_BG_SELECTED: Color = Color::Rgb(245, 206, 88);
+const HIGHLIGHT_BG_UNSELECTED: Color = Color::Rgb(240, 137, 48);
+
 pub enum CursorCalculationMode<'a> {
     FileInput(&'a Input),
     Buffer,
@@ -165,41 +168,26 @@ impl UIState {
 
     pub fn focus_next_highlight(&mut self) {
         let highlights = &mut self.buffer_state.highlight_state.highlights;
-
         let currently_focused = self.buffer_state.highlight_state.focused;
-
-        let next_highlight = currently_focused + 1;
+        let n_of_highlights = highlights.len();
 
         highlights[currently_focused].is_selected = false;
 
-        let n_of_highlights = highlights.len();
-
-        if next_highlight < n_of_highlights {
-            highlights[next_highlight].is_selected = true;
-            self.buffer_state.highlight_state.focused = next_highlight;
-        } else {
-            highlights[0].is_selected = true;
-            self.buffer_state.highlight_state.focused = 0;
-        }
+        let next_highlight = currently_focused.wrapping_add(1) % n_of_highlights;
+        highlights[next_highlight].is_selected = true;
+        self.buffer_state.highlight_state.focused = next_highlight;
     }
 
     pub fn focus_prev_highlight(&mut self) {
         let highlights = &mut self.buffer_state.highlight_state.highlights;
-
         let currently_focused = self.buffer_state.highlight_state.focused;
-
-        let prev_highlight = currently_focused.saturating_sub(1);
+        let n_of_highlights = highlights.len();
 
         highlights[currently_focused].is_selected = false;
 
-        if currently_focused > 0 {
-            highlights[prev_highlight].is_selected = true;
-            self.buffer_state.highlight_state.focused = prev_highlight;
-        } else {
-            let n_of_highlights = highlights.len();
-            highlights[n_of_highlights - 1].is_selected = true;
-            self.buffer_state.highlight_state.focused = n_of_highlights - 1;
-        }
+        let prev_highlight = currently_focused.wrapping_sub(1) % n_of_highlights;
+        highlights[prev_highlight].is_selected = true;
+        self.buffer_state.highlight_state.focused = prev_highlight;
     }
 
     pub fn clear_highlights(&mut self) {
@@ -324,9 +312,9 @@ impl BufferDisplayState {
                 }
 
                 let highlight_bg = if highlight.is_selected {
-                    Color::Rgb(245, 206, 88)
+                    HIGHLIGHT_BG_SELECTED
                 } else {
-                    Color::Rgb(240, 137, 48)
+                    HIGHLIGHT_BG_UNSELECTED
                 };
 
                 // Add highlighted text
@@ -350,6 +338,17 @@ impl BufferDisplayState {
         }
 
         Text::from(highlighted_content)
+    }
+
+    fn prepare_paragraph_widget<'a>(&mut self, contents: &'a str) -> Paragraph<'a> {
+        let paragraph_widget = if !self.highlight_state.highlights.is_empty() {
+            let text_widget = self.add_highlights(contents, &self.highlight_state.highlights);
+            Paragraph::new(text_widget)
+        } else {
+            let text_widget = Text::from(contents);
+            Paragraph::new(text_widget)
+        };
+        paragraph_widget
     }
 }
 
@@ -388,16 +387,8 @@ impl StatefulWidget for BufferDisplayWidget<'_> {
         let shifted_contents = state.shift_contents(self.buffer_contents.to_string());
         // Render the text using Paragraph
 
-        if !state.highlight_state.highlights.is_empty() {
-            let text_widget =
-                state.add_highlights(&shifted_contents, &state.highlight_state.highlights);
-            let paragraph_widget = Paragraph::new(text_widget);
-            paragraph_widget.render(area, buf);
-        } else {
-            let text_widget = Text::from(shifted_contents);
-            let paragraph_widget = Paragraph::new(text_widget);
-            paragraph_widget.render(area, buf);
-        }
+        let paragraph_widget = state.prepare_paragraph_widget(&shifted_contents);
+        paragraph_widget.render(area, buf);
     }
 }
 
@@ -441,7 +432,7 @@ impl StatefulWidget for SearchInput {
 mod tests {
     use crate::{
         test_util::ui::{n_spaces, nth_line_from_terminal_buffer, vertical_border},
-        ui::{BufferDisplayOffset, BufferDisplayState, FileInputRole, FileInputState},
+        ui::{BufferDisplayState, FileInputRole, FileInputState},
     };
     use ratatui::style::{Color, Modifier, Style};
     use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
@@ -486,8 +477,7 @@ mod tests {
     #[test]
     fn test_add_highlights_single_line_unselected() {
         // Setup a default display state with no offset.
-        let mut state = BufferDisplayState::default();
-        state.offset = BufferDisplayOffset::new(0, 0);
+        let state = BufferDisplayState::default();
 
         let content = "Hello world";
         let highlight = Highlight {
@@ -531,8 +521,7 @@ mod tests {
     #[test]
     fn test_add_highlights_single_line_selected() {
         // Test with a selected highlight which uses a different background color.
-        let mut state = BufferDisplayState::default();
-        state.offset = BufferDisplayOffset::new(0, 0);
+        let state = BufferDisplayState::default();
 
         let content = "Hello world";
         let highlight = Highlight {
@@ -573,8 +562,7 @@ mod tests {
 
     #[test]
     fn test_add_highlights_multiple_lines_and_highlights() {
-        let mut state = BufferDisplayState::default();
-        state.offset = BufferDisplayOffset::new(0, 0);
+        let state = BufferDisplayState::default();
 
         let content = "Line one\nLine two\nLine three";
         let highlights = vec![
