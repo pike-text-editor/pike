@@ -44,7 +44,6 @@ impl App {
         if let Some(path) = &file_path {
             if path.is_dir() {
                 env::set_current_dir(path).expect("Failed to change current working directory");
-                let cwd = file_path.clone();
                 file_path = None;
             }
         }
