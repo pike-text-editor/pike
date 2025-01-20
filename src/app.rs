@@ -471,7 +471,9 @@ impl App {
     }
 
     fn try_handle_input_key(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
-        // TODO: Better error handling
+        if self.backend.current_buffer().is_none() {
+            return Ok(false);
+        }
         if let KeyCode::Char(ch) = key.code {
             self.backend
                 .write_to_current_buffer(&ch.to_string())
@@ -483,6 +485,12 @@ impl App {
             KeyCode::Enter => {
                 self.backend
                     .write_to_current_buffer("\n")
+                    .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
+                Ok(true)
+            }
+            KeyCode::Tab => {
+                self.backend
+                    .write_to_current_buffer("    ")
                     .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
                 Ok(true)
             }
@@ -939,6 +947,25 @@ mod tests {
         app.handle_key_event(event)
             .expect("Failed to handle key event");
         assert_eq!(app.backend.current_buffer_contents(), "");
+    }
+
+    #[test]
+    fn app_inserts_spaces_when_tab_pressed() {
+        let mut app = app_with_file_contents("");
+        let event = KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE);
+        app.handle_key_event(event)
+            .expect("Failed to handle key event");
+        assert_eq!(app.backend.current_buffer_contents(), "    ");
+    }
+
+    #[test]
+    fn test_app_does_not_write_when_banner_open() {
+        let mut app = App::build_default();
+        assert!(app.backend.current_buffer().is_none());
+        // if it called backend to write here, this would panic
+        assert!(app
+            .handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE))
+            .is_ok());
     }
 
     #[test]
