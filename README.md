@@ -1,103 +1,87 @@
-# pike (perfectly incomplex konsole editor) - szkielet kodu
+# Pike - Perfectly Incomplex Konsole Editor
 
-#### Maksym Bieńkowski, Jędrzej Grabski
+Pike is a simple, uncomplicated, and easily configurable command-line text editor designed to be a lightweight and user-friendly replacement for nano. It supports basic text editing features with intuitive keyboard shortcuts and a clear terminal interface.
 
-![Linux](https://github.com/pike-text-editor/pike/actions/workflows/linux-ci.yaml/badge.svg)
+![Linux](https://github.com/pike-text-editor/pike/actions/workflows/linux-ci.yaml/badge.svg)  
 ![Windows](https://github.com/pike-text-editor/pike/actions/workflows/windows-ci.yaml/badge.svg)
 
-Branch zawiera szkielet kodu z ogólnymi, niewypełnionymi sygnaturami
-oraz definicjami obiektów. Szybki overview modułów:
+## Features
 
-- `app` - zawiera frontendową porcję projektu, obiekt reprezentujący jego stan,
-  funkcjonalność związaną z obsługą zdarzeń i rysowaniem ekranu.
-- `pike` - reprezentacja backendowej części projektu, zarządza otwartymi buforami, trzyma
-  informację o cwd, wchodzi w interakcję z systemem plików
-- `config` - zawiera obiekt reprezentujący konfigurację użytkownika, który ładowany
-  będzie z pliku konfiguracyjnego. Póki co, jedynymi wspieranymi ustawieniami są
-  skróty klawiszowe, prawdopodobnie się to zmieni na przestrzeni czasu.
-- `operations` - enumeracja reprezentująca mapowalne na skróty klawiszowe
-  operacje i tworzenie ich na podstawie stringów zawartych w pliku
-- `ui` - moduł zawierający reużywalne komponenty frontendowe, na ten moment
-  ograniczony do obiektu `Picker`, na podstawie którego ma działać m.in.
-  wybór pliku do otwarcia przy wyszukiwaniu po nazwie
+- Simple and intuitive terminal interface.
+- Highlighting and search functionality within buffers.
+- Undo/redo support for efficient editing.
+- Configurable keyboard shortcuts.
+- Cross-platform support for Linux and Windows.
 
-## Użycie
+---
 
-### Przy pomocy `just`
+## Installation
 
-`just lint` sprawdza kod za pomocą `cargo clippy`.
+### Building from Source
 
-`just build` buduje projekt w trybie release.
+To build and install Pike, you need Rust installed on your system. Follow the instructions for your platform:
 
-`just test` uruchamia testy z włączonymi wszystkimi funkcjami.
+### Linux
 
-`just windows-build` buduje projekt dla Windowsa za pomocą `cross`.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/pike-text-editor/pike.git
+   cd pike
+   ```
 
-- wymaga [cross](https://github.com/cross-rs/cross).
+2. Build the project:
+   ```bash
+   cargo build --release
+   ```
 
-`just windows-test` uruchamia testy dla Windowsa za pomocą `cross`.
+3. Install the binary (requires sudo for system-wide installation):
+   ```bash
+   sudo cp target/release/pike /usr/local/bin
+   ```
 
-- wymaga [cross](https://github.com/cross-rs/cross).
+4. Run Pike:
+   ```bash
+   pike
+   ```
 
-`just cov` generuje raport pokrycia testami w formacie HTML.
+### Windows
 
-- wymaga [cargo-binutils](https://github.com/rust-embedded/cargo-binutils) oraz [grcov](https://github.com/mozilla/grcov)
+1. Clone the repository:
+   ```powershell
+   git clone https://github.com/pike-text-editor/pike.git
+   cd pike
+   ```
 
-### Bez `just`
+2. Build the project using [cross](https://github.com/cross-rs/cross) or Rust's native Windows toolchain:
+   ```powershell
+   cargo build --release
+   ```
 
-`cargo run` uruchamia projekt
+3. Copy the binary to a location in your PATH:
+   ```powershell
+   copy .\target\release\pike.exe C:\Path\To\Bin
+   ```
 
-`cargo test` uruchamia testy w projekcie
+4. Run Pike:
+   ```powershell
+   pike
+   ```
 
-`cargo doc -p pike` generuje dokumentację na podstawie komentarzy
+---
 
-#### Kompilacja dla windows
+## Documentation
 
-Do kompilacji skrośnej na Windowsa używamy [cross](https://github.com/cross-rs/cross).
+Comprehensive documentation, including usage instructions and examples, is available in the [`docs/usage.md`](docs/usage.md) file. It covers:
 
-Wymaga on dostępu do dockera lub podmana na hoście,
-więcej w [dokumentacji](https://github.com/cross-rs/cross?tab=readme-ov-file#usage).
+- How to use Pike effectively.
+- Configuration options for customizing shortcuts and behavior.
 
-`cross build --target=x86_64-pc-windows-gnu` kompiluje projekt na windows toolchainem gnu
+---
 
-`cross test --target=x86_64-pc-windows-gnu` uruchamia testy dla windowsa w skonteneryzowanym środowisku
+## Contributing
 
-#### Narzędzia
+Contributions are welcome! Feel free to submit issues, feature requests, or pull requests to enhance Pike.
 
-##### Formatter
+---
 
-Używanym w projekcie formatterem jest [rustfmt](https://github.com/rust-lang/rustfmt).
-
-Instalacja:
-
-```bash
-rustup update
-rustup component add rustfmt
-```
-
-Uruchomienie:
-
-```bash
-cargo fmt           # formatuje pliki in-place
-cargo fmt --check   # nie formatuje plików in-place
-```
-
-##### Linter
-
-Używanym linterem jest [clippy](https://github.com/rust-lang/rust-clippy)
-
-Instalacja:
-
-```bash
-rustup update
-rustup component add clippy
-```
-
-Uruchomienie:
-
-```bash
-cargo clippy        # bez aplikowania sugestii
-cargo clippy --fix  # aplikuje sugestie
-```
-
-Oba narzędzia powinny być dostępne w domyślnej instalacji Rusta
+Start using Pike as your go-to command-line text editor today!
