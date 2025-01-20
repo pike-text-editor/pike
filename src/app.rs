@@ -471,7 +471,9 @@ impl App {
     }
 
     fn try_handle_input_key(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
-        // TODO: Better error handling
+        if self.backend.current_buffer().is_none() {
+            return Ok(false);
+        }
         if let KeyCode::Char(ch) = key.code {
             self.backend
                 .write_to_current_buffer(&ch.to_string())
@@ -483,6 +485,12 @@ impl App {
             KeyCode::Enter => {
                 self.backend
                     .write_to_current_buffer("\n")
+                    .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
+                Ok(true)
+            }
+            KeyCode::Tab => {
+                self.backend
+                    .write_to_current_buffer("    ")
                     .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
                 Ok(true)
             }
