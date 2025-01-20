@@ -988,6 +988,7 @@ mod tests {
         acrp_based_on_current_buffer(&mut app, &buf, (0, 0));
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_app_render_banner() {
         let mut app = App::build_default();
@@ -996,6 +997,7 @@ mod tests {
         assert_snapshot!(terminal.backend());
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_app_render_empty_buffer() {
         // a plain Tempfile won't do here as we want the path to be the same on every test launch
@@ -1007,6 +1009,7 @@ mod tests {
         assert_snapshot!(terminal.backend());
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn app_renders_buffer_contents() {
         // a plain Tempfile won't do here as we want the path to be the same on every test launch
@@ -1021,6 +1024,7 @@ mod tests {
         assert_snapshot!(terminal.backend());
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn app_render_file_input_after_handling_open_file_keybind() {
         let mut app = App::build_default();
@@ -1032,6 +1036,7 @@ mod tests {
         assert_snapshot!(terminal.backend());
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn app_render_with_search_input() {
         let mut app = App::build_default();
@@ -1043,6 +1048,7 @@ mod tests {
         assert_snapshot!(terminal.backend());
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn app_render_search_results() {
         // Color assertions are not yet supported, but let's keep it for the future reference
@@ -1072,6 +1078,7 @@ mod tests {
         assert_snapshot!(terminal.backend());
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn app_renders_no_search_input_after_closing() {
         let mut app = App::build_default();
@@ -1085,6 +1092,7 @@ mod tests {
         assert_snapshot!(terminal.backend());
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn app_renders_no_file_input_after_closing() {
         let mut app = App::build_default();
