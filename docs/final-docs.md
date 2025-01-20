@@ -31,8 +31,8 @@ Wykaz lini kodu wygenerowany przez narzędzie [cloc](https://github.com/AlDanial
 
 Ciężko jest teraz wymienić konkretne problemy, które spotkały nas podczas pracy, jednak częstym motywem był brak odpowiedzialnego zarządzania
 pamięcią. Reguły Rust-owego kompilatora wymagają od programisty mądrego planowania struktury zależności w swoim kodzie i z tym borykaliśmy się
-najczęsciej. Brak dokładniejszego zaplanowania gdzie powinny znajdować się poszczególne metody i obiekty sprawił, że refaktoring dużych części kodu
-był zjawiskiem raczej częstszym niż rzadszym. Wraz z biegiem projektu to problemy jednak zaczęły pojawiąć się coraz rzadziej, więc uczyniliśmy pewne
+najczęściej. Brak dokładniejszego zaplanowania gdzie powinny znajdować się poszczególne metody i obiekty sprawił, że refaktoring dużych części kodu
+był zjawiskiem raczej częstszym niż rzadszym. Wraz z biegiem projektu to problemy jednak zaczęły pojawiać się coraz rzadziej, więc uczyniliśmy pewne
 postępy.
 
 ## Wnioski
@@ -41,7 +41,7 @@ Projekt ten był świetną okazją żeby zaznajomić się z językiem Rust i po
 Zabranie się za tak duży projekt bez wcześniejszego styku z tym językiem okazało się dość dużym wyzwaniem, jednak sprawiło nam zdecydowanie
 wiele frajdy.
 
-Jesteśmy zadowoleni z efektu końcowego, jednak uważamy, że pozostało miejsce na wiele nowych funckjonalności i ulepszeń, które planujemy w
+Jesteśmy zadowoleni z efektu końcowego, jednak uważamy, że pozostało miejsce na wiele nowych funkcjonalności i ulepszeń, które planujemy w
 przyszłości wprowadzić.
 
 Wielką zaletą tego projektu jest to, że nie musi zostać odłożony na półkę po oddaniu, a ten dokument piszę w taki sposób:
