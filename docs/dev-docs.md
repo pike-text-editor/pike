@@ -1,11 +1,11 @@
-# pike (Perfectly Incomplex Konsole Editor) - Code Skeleton
+# pike (Perfectly Incomplex Konsole Editor) - developer docs
 
 #### Maksym Bieńkowski, Jędrzej Grabski
 
 ![Linux](https://github.com/pike-text-editor/pike/actions/workflows/linux-ci.yaml/badge.svg)  
 ![Windows](https://github.com/pike-text-editor/pike/actions/workflows/windows-ci.yaml/badge.svg)
 
-### Module Summary:
+### Module Summary
 
 1. **`welcome_pike.rs`**:
    - Contains the welcome banner displayed when the editor is launched without a source file.
@@ -83,12 +83,14 @@ More details in the [documentation](https://github.com/cross-rs/cross#usage).
 The project uses [rustfmt](https://github.com/rust-lang/rustfmt) for formatting.
 
 **Installation**:
+
 ```bash
 rustup update
 rustup component add rustfmt
 ```
 
 **Usage**:
+
 ```bash
 cargo fmt           # Formats files in-place
 cargo fmt --check   # Checks formatting without modifying files
@@ -99,15 +101,18 @@ cargo fmt --check   # Checks formatting without modifying files
 The project uses [clippy](https://github.com/rust-lang/rust-clippy) as the linter.
 
 **Installation**:
+
 ```bash
 rustup update
 rustup component add clippy
 ```
 
 **Usage**:
+
 ```bash
 cargo clippy        # Runs linter without applying suggestions
 cargo clippy --fix  # Automatically applies suggestions
 ```
 
 Both tools should be available in the default Rust installation.
+
