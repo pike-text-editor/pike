@@ -950,6 +950,25 @@ mod tests {
     }
 
     #[test]
+    fn app_inserts_spaces_when_tab_pressed() {
+        let mut app = app_with_file_contents("");
+        let event = KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE);
+        app.handle_key_event(event)
+            .expect("Failed to handle key event");
+        assert_eq!(app.backend.current_buffer_contents(), "    ");
+    }
+
+    #[test]
+    fn test_app_does_not_write_when_banner_open() {
+        let mut app = App::build_default();
+        assert!(app.backend.current_buffer().is_none());
+        // if it called backend to write here, this would panic
+        assert!(app
+            .handle_key_event(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE))
+            .is_ok());
+    }
+
+    #[test]
     fn handles_navigation_keys() {
         let mut app = app_with_file_contents("line1\nline2\nline3");
         let buf = Buffer::empty(Rect::new(0, 0, 10, 3));
