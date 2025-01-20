@@ -1175,4 +1175,30 @@ mod pike_test {
         assert_eq!(results[0].start, Position { line: 0, offset: 7 });
         assert_eq!(results[0].length, 5);
     }
+
+    #[test]
+    fn pike_switch_buffers() {
+        let file1 = temp_file_with_contents("Hello, world!");
+        let file2 = temp_file_with_contents("Goodbye, world!");
+        let (mut pike, _) = tmp_pike_and_working_dir(None, None);
+
+        pike.open_file(file1.path(), 0, 0)
+            .expect("Failed to open file");
+        pike.open_file(file2.path(), 0, 0)
+            .expect("Failed to open file");
+
+        assert_eq!(
+            pike.current_buffer_contents(),
+            "Goodbye, world!".to_string()
+        );
+
+        pike.previous_buffer();
+        assert_eq!(pike.current_buffer_contents(), "Hello, world!".to_string());
+
+        pike.next_buffer();
+        assert_eq!(
+            pike.current_buffer_contents(),
+            "Goodbye, world!".to_string()
+        );
+    }
 }
