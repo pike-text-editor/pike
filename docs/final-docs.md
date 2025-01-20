@@ -1,5 +1,11 @@
 # Pike - Perfectly Incomplex Konsole Editor
 
+<!-- pandoc final-docs.md -o final-docs.pdf \
+    --pdf-engine=xelatex \
+    -V geometry:margin=0.5in \
+    -V lang=polish \
+    -V babel-lang=polish -->
+
 ### Autorzy
 
 - Maksym Bieńkowski
