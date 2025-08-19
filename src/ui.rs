@@ -70,7 +70,7 @@ impl UIState {
     /// Calculate the cursor position for a given `CursorCalculation` mode
     pub fn calculate_cursor_position(
         &self,
-        calc_mode: CursorCalculationMode,
+        calc_mode: &CursorCalculationMode,
         layout: &Rc<[Rect]>,
         cursor_pos: Option<BufferPosition>,
     ) -> TerminalPosition {
@@ -79,7 +79,7 @@ impl UIState {
 
         match calc_mode {
             CursorCalculationMode::FileInput(input) => {
-                self.calculate_cursor_for_file_input(input, layout[main_area])
+                Self::calculate_cursor_for_file_input(input, layout[main_area])
             }
             CursorCalculationMode::Buffer => {
                 self.calculate_cursor_for_buffer(layout[status_bar_area], cursor_pos)
@@ -88,16 +88,16 @@ impl UIState {
     }
 
     /// Calculate position for file input
-    pub fn calculate_cursor_for_file_input(&self, input: &Input, area: Rect) -> TerminalPosition {
+    pub fn calculate_cursor_for_file_input(input: &Input, area: Rect) -> TerminalPosition {
         let border_offset = 1;
 
         let max_x = {
-            let (x, _) = Self::max_rect_position(&area);
+            let (x, _) = Self::max_rect_position(area);
             x.saturating_sub(border_offset)
         };
 
         let (base_x, base_y) = {
-            let (x, y) = Self::base_rect_position(&area);
+            let (x, y) = Self::base_rect_position(area);
             (x + border_offset, y)
         };
 
@@ -115,8 +115,8 @@ impl UIState {
         // If we have a cursor position, compute accordingly;
         // otherwise return a default
         if let Some(cursor_pos) = cursor_pos {
-            let (max_x, max_y) = Self::max_rect_position(&area);
-            let (base_x, base_y) = Self::base_rect_position(&area);
+            let (max_x, max_y) = Self::max_rect_position(area);
+            let (base_x, base_y) = Self::base_rect_position(area);
 
             let x_offset = self.buffer_state.offset.x as u16;
             let y_offset = self.buffer_state.offset.y as u16;
@@ -134,12 +134,12 @@ impl UIState {
     }
 
     /// Calculate the maximum renderable position in a given area
-    fn max_rect_position(area: &Rect) -> (u16, u16) {
+    fn max_rect_position(area: Rect) -> (u16, u16) {
         (area.width.saturating_sub(1), area.height.saturating_sub(1))
     }
 
     /// Calculate the base (top-left) position in a given area
-    fn base_rect_position(area: &Rect) -> (u16, u16) {
+    fn base_rect_position(area: Rect) -> (u16, u16) {
         (area.x, area.y)
     }
 
@@ -193,8 +193,8 @@ impl UIState {
 /// Holds the information how much offset is the
 /// current buffer when displayed - for example, it's
 /// displayed from line 6 until either the end of the buffer ->
-/// BufferDisplayOffset{ 0, 6 }. Used to consistently shift the buffer
-/// when rendering. Persisted in UIState between renders.
+/// `BufferDisplayOffset`{ 0, 6 }. Used to consistently shift the buffer
+/// when rendering. Persisted in `UIState` between renders.
 #[derive(Default)]
 pub struct BufferDisplayOffset {
     /// X offset of the line pointed at by the cursor
@@ -253,7 +253,7 @@ impl BufferDisplayState {
 
     /// Shifts the content of the buffer down by the offset and returns the resulting string.
     /// Basically removes the first self.offset.y lines and joins the remaining ones.
-    fn shift_contents_down(&mut self, contents: String) -> String {
+    fn shift_contents_down(&mut self, contents: &str) -> String {
         contents
             .lines()
             .skip(self.offset.y)
@@ -277,7 +277,7 @@ impl BufferDisplayState {
 
     /// Shifts the contents of the buffer down and to the right by the offset and returns the
     /// resulting string.
-    fn shift_contents(&mut self, contents: String) -> String {
+    fn shift_contents(&mut self, contents: &str) -> String {
         let down_shifted = self.shift_contents_down(contents);
         self.shift_contents_right(down_shifted)
     }
@@ -335,13 +335,14 @@ impl BufferDisplayState {
 
     /// Prepares a paragraph widget with the given contents, applying highlights if present.
     fn prepare_paragraph_widget<'a>(&mut self, contents: &'a str) -> Paragraph<'a> {
-        let paragraph_widget = if !self.highlight_state.highlights.is_empty() {
-            let text_widget = self.add_highlights(contents, &self.highlight_state.highlights);
-            Paragraph::new(text_widget)
-        } else {
+        let paragraph_widget = if self.highlight_state.highlights.is_empty() {
             let text_widget = Text::from(contents);
             Paragraph::new(text_widget)
+        } else {
+            let text_widget = self.add_highlights(contents, &self.highlight_state.highlights);
+            Paragraph::new(text_widget)
         };
+
         paragraph_widget
     }
 }
@@ -378,7 +379,7 @@ impl StatefulWidget for BufferDisplayWidget<'_> {
             state.update_y_offset(area, pos.line);
         }
         // Shift contents based on offset
-        let shifted_contents = state.shift_contents(self.buffer_contents.to_string());
+        let shifted_contents = state.shift_contents(self.buffer_contents);
         // Render the text using Paragraph
 
         let paragraph_widget = state.prepare_paragraph_widget(&shifted_contents);
@@ -402,7 +403,7 @@ impl StatefulWidget for FileInput {
                 .borders(widgets::Borders::all())
                 .title("Enter relative file path"),
         );
-        widget.render(area, buf)
+        widget.render(area, buf);
     }
 }
 
@@ -418,7 +419,7 @@ impl StatefulWidget for SearchInput {
                 .borders(widgets::Borders::all())
                 .title("Search for: "),
         );
-        widget.render(area, buf)
+        widget.render(area, buf);
     }
 }
 

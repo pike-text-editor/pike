@@ -1,7 +1,7 @@
 use std::{
     env,
     io::{self},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process,
     rc::Rc,
 };
@@ -50,7 +50,7 @@ impl App {
         match backend {
             Ok(backend) => App::new(backend),
             Err(err) => {
-                eprintln!("{}", err);
+                eprintln!("{err}");
                 process::exit(1);
             }
         }
@@ -112,27 +112,27 @@ impl App {
         if let Some(ref input_state) = file_input_value {
             self.render_file_input(status_bar_area, frame.buffer_mut());
             render_cursor_position = self.ui_state.calculate_cursor_position(
-                CursorCalculationMode::FileInput(&input_state.input),
+                &CursorCalculationMode::FileInput(&input_state.input),
                 &layout,
                 cursor_pos,
             );
         } else if let Some(ref search_input) = search_input_value {
             self.render_search_input(status_bar_area, frame.buffer_mut());
             render_cursor_position = self.ui_state.calculate_cursor_position(
-                CursorCalculationMode::FileInput(search_input),
+                &CursorCalculationMode::FileInput(search_input),
                 &layout,
                 cursor_pos,
             );
         } else {
             render_cursor_position = self.ui_state.calculate_cursor_position(
-                CursorCalculationMode::Buffer,
+                &CursorCalculationMode::Buffer,
                 &layout,
                 cursor_pos,
             );
             self.render_status_bar(status_bar_area, frame.buffer_mut());
         }
 
-        self.render_cursor(frame, render_cursor_position);
+        Self::render_cursor(frame, render_cursor_position);
     }
 
     /// Splits an area using the main app layout and returns the
@@ -159,7 +159,7 @@ impl App {
     fn render_buffer_contents(&mut self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
         // Display a welcome message if no buffer is open
         if self.backend.current_buffer().is_none() {
-            self.render_welcome_banner(area, buf);
+            Self::render_welcome_banner(area, buf);
         }
 
         let contents = self.backend.current_buffer_contents();
@@ -169,7 +169,7 @@ impl App {
         widget.render(area, buf, &mut self.ui_state.buffer_state);
     }
 
-    fn render_welcome_banner(&self, area: Rect, buf: &mut ratatui::prelude::Buffer) {
+    fn render_welcome_banner(area: Rect, buf: &mut ratatui::prelude::Buffer) {
         let banner = WELCOME_MESSAGE;
         let paragraph = Paragraph::new(banner).block(Block::default().borders(Borders::NONE));
         paragraph.render(area, buf);
@@ -181,7 +181,7 @@ impl App {
         let is_modified = self.backend.is_current_buffer_modified();
 
         let indicator = if is_modified { "*" } else { "" };
-        let text_widget = Text::from(format!("{}{}", filename, indicator));
+        let text_widget = Text::from(format!("{filename}{indicator}"));
 
         let paragraph_widget = Paragraph::new(text_widget).wrap(Wrap { trim: false });
         let block_widget = paragraph_widget.block(Block::default().borders(Borders::TOP));
@@ -190,7 +190,7 @@ impl App {
     }
 
     /// Render the cursor in a given position
-    fn render_cursor(&self, frame: &mut ratatui::prelude::Frame, position: TerminalPosition) {
+    fn render_cursor(frame: &mut ratatui::prelude::Frame, position: TerminalPosition) {
         frame.set_cursor_position(position);
     }
 
@@ -226,7 +226,7 @@ impl App {
         self.ui_state.search_input = None;
     }
 
-    /// Open a file input with the given contents and store it in UIState
+    /// Open a file input with the given contents and store it in `UIState`
     fn open_file_input(&mut self, contents: &str, role: FileInputRole) {
         self.ui_state.file_input = Some((contents, role).into());
     }
@@ -254,16 +254,15 @@ impl App {
     /// indicating whether the event has been handled or not.
     fn try_handle_key_press_with_file_input(&mut self, key: KeyEvent) -> bool {
         // No input means the event can't be handled
-        let input = match self.ui_state.file_input.as_mut() {
-            Some(input) => input,
-            None => return false,
+        let Some(input) = self.ui_state.file_input.as_mut() else {
+            return false;
         };
 
         // Perform the corresponding operation and close the input
         if (key.code, key.modifiers) == (KeyCode::Enter, KeyModifiers::NONE) {
             let path = input.to_path();
             match input.role {
-                FileInputRole::GetOpenPath => self.open_file_from_path(path),
+                FileInputRole::GetOpenPath => self.open_file_from_path(&path),
                 FileInputRole::GetSavePath => {
                     self.backend.bind_current_buffer_to_path(path);
                     self.handle_save_operation();
@@ -295,9 +294,8 @@ impl App {
     /// Returns a boolean indicating whether the event has been handled or not.
     fn try_handle_key_press_with_search_input(&mut self, key: KeyEvent) -> bool {
         // No input means the event can't be handled
-        let input = match self.ui_state.search_input.as_mut() {
-            Some(input) => input,
-            None => return false,
+        let Some(input) = self.ui_state.search_input.as_mut() else {
+            return false;
         };
 
         // Perform the corresponding operation and close the input
@@ -307,7 +305,7 @@ impl App {
                 .backend
                 .search_in_current_buffer(&query)
                 .unwrap_or_else(|err| {
-                    eprintln!("Error searching in buffer: {}", err);
+                    eprintln!("Error searching in buffer: {err}");
                     vec![]
                 });
 
@@ -366,21 +364,18 @@ impl App {
     }
 
     /// Open a file from a given path
-    fn open_file_from_path(&mut self, path: PathBuf) {
+    fn open_file_from_path(&mut self, path: &Path) {
         self.backend
-            .create_and_open_file(&path)
+            .create_and_open_file(path)
             // TODO: display message in the UI
             .expect("Error opening file!");
     }
 
-    /// Try to convert a given key event to an InputRequest to be sent to a tui_input::Input
+    /// Try to convert a given key event to an `InputRequest` to be sent to a `tui_input::Input`
     /// instance.
     fn key_event_to_input_request(key: KeyEvent) -> Option<tui_input::InputRequest> {
         match (key.code, key.modifiers) {
-            (KeyCode::Char(chr), KeyModifiers::NONE) => {
-                Some(tui_input::InputRequest::InsertChar(chr))
-            }
-            (KeyCode::Char(chr), KeyModifiers::SHIFT) => {
+            (KeyCode::Char(chr), KeyModifiers::SHIFT | KeyModifiers::NONE) => {
                 Some(tui_input::InputRequest::InsertChar(chr))
             }
             (KeyCode::Backspace, KeyModifiers::NONE) => {
@@ -532,7 +527,7 @@ impl App {
     fn handle_save_operation(&mut self) {
         if let Some(_path) = self.backend.current_buffer_path() {
             if let Err(err) = self.backend.save_current_buffer() {
-                eprintln!("Failed to save buffer: {}", err);
+                eprintln!("Failed to save buffer: {err}");
             }
         } else {
             // Ask for filepath if the buffer is not bound to one
@@ -569,7 +564,7 @@ mod tests {
             temp_file_with_contents,
             ui::{n_spaces, solid_border},
         },
-        ui::FileInputRole,
+        ui::{self, FileInputRole},
     };
 
     use super::App;
@@ -602,6 +597,7 @@ mod tests {
     /// Used in unit tests to provide the UI element, based on which the cursor
     /// position should be calculated, so that a testing buffer can be created only
     /// to accommodate this element instead of the whole UI.
+    #[derive(Copy, Clone)]
     enum CursorRenderingWidget {
         CurrentBuffer,
         FileInput,
@@ -639,15 +635,14 @@ mod tests {
                     .file_input
                     .as_ref()
                     .expect("A file input should be open when testing cursor in file input");
-                app.ui_state
-                    .calculate_cursor_for_file_input(&input.input, buf.area)
+                ui::UIState::calculate_cursor_for_file_input(&input.input, buf.area)
             }
         };
 
         assert_eq!(pos, expected.into());
     }
 
-    /// Shorthand for defining the renderer in unit tests and calling assert_cursor_render_pos
+    /// Shorthand for defining the renderer in unit tests and calling `assert_cursor_render_pos`
     fn acrp_based_on_current_buffer(
         app: &mut App,
         buf: &ratatui::buffer::Buffer,
@@ -715,7 +710,7 @@ mod tests {
         let mut buf = Buffer::empty(Rect::new(0, 0, width, 2));
         let expected = Buffer::with_lines(vec![solid_border(width.into()), filename.to_string()]);
         app.render_status_bar(buf.area, &mut buf);
-        assert_eq!(buf, expected)
+        assert_eq!(buf, expected);
     }
 
     /// The cursor should not move past the bounds of the buffer
@@ -878,7 +873,7 @@ mod tests {
         let buf = Buffer::empty(Rect::new(0, 0, 4, 1));
         app.open_file_input("hello, world!", FileInputRole::GetOpenPath);
         // Does not reach (3, 1) because of the border
-        acrp_based_on_file_input(&mut app, &buf, (2, 1))
+        acrp_based_on_file_input(&mut app, &buf, (2, 1));
     }
 
     #[test]
@@ -907,7 +902,7 @@ mod tests {
 
         app.handle_key_event(close_event)
             .expect("Failed to handle key event");
-        assert!(app.exit)
+        assert!(app.exit);
     }
 
     #[test]
@@ -986,8 +981,7 @@ mod tests {
         for (event, expected_pos) in navigation_cases {
             assert!(
                 app.try_handle_navigation(event),
-                "Navigation event {:?} was not handled",
-                event
+                "Navigation event {event:?} was not handled",
             );
             acrp_based_on_current_buffer(&mut app, &buf, expected_pos);
         }
@@ -1001,8 +995,7 @@ mod tests {
         let event = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
         assert!(
             !app.try_handle_navigation(event),
-            "Navigation event {:?} was handled",
-            event
+            "Navigation event {event:?} was handled",
         );
         acrp_based_on_current_buffer(&mut app, &buf, (0, 0));
     }
@@ -1088,7 +1081,7 @@ mod tests {
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         ];
 
-        for event in wor_query_key_events.iter() {
+        for event in &wor_query_key_events {
             app.handle_key_event(*event)
                 .expect("Failed to handle key event");
         }
@@ -1151,7 +1144,7 @@ mod tests {
             KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE),
         ];
 
-        for event in hello.iter() {
+        for event in &hello {
             app.handle_key_event(*event)
                 .expect("Failed to handle key event");
         }
