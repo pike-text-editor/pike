@@ -34,7 +34,6 @@ pub struct Config {
     pub key_mappings: HashMap<KeyShortcut, Operation>,
 }
 
-#[allow(dead_code)]
 impl Config {
     /// Creates a config instance based on toml string representation
     pub fn from_toml_representation(s: &str) -> Result<Config, String> {

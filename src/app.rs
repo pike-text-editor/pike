@@ -1,6 +1,6 @@
 use std::{
     env,
-    io::{self, ErrorKind},
+    io::{self},
     path::PathBuf,
     process,
     rc::Rc,
@@ -27,14 +27,12 @@ use crate::{
 };
 
 /// TUI application which displays the UI and handles events
-#[allow(dead_code)]
 pub struct App {
     exit: bool,
     backend: Pike,
     ui_state: UIState,
 }
 
-#[allow(dead_code, unused_variables, unused_mut)]
 impl App {
     pub fn build(args: Args) -> App {
         let cwd = env::current_dir().map_err(|_| "Failed to get current working directory");
@@ -45,7 +43,6 @@ impl App {
 
         let config_path = args.config.map(PathBuf::from);
         let file_path = args.file.map(PathBuf::from);
-        let no_file_open = file_path.is_none();
 
         let backend: Result<Pike, String> =
             Pike::build(cwd.expect("Error case was handled"), file_path, config_path);
@@ -78,6 +75,7 @@ impl App {
     }
 
     /// Builds an app with the default configuration and no open file
+    #[cfg(test)]
     fn build_default() -> Self {
         App::build(Args {
             config: None,
@@ -104,7 +102,7 @@ impl App {
 
         let cursor_pos = self.backend.cursor_position();
 
-        let mut render_cursor_position;
+        let render_cursor_position;
 
         self.render_buffer_contents(main_area, frame.buffer_mut());
 
@@ -408,7 +406,11 @@ impl App {
             return Ok(());
         }
 
-        if !key.modifiers.contains(KeyModifiers::CONTROL) && self.try_handle_input_key(key)? {
+        if self.try_write_char(key)? {
+            return Ok(());
+        }
+
+        if self.try_handle_special_keys(key)? {
             return Ok(());
         }
 
@@ -470,28 +472,37 @@ impl App {
         }
     }
 
-    fn try_handle_input_key(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
-        if self.backend.current_buffer().is_none() {
+    fn try_write_char(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
+        if self.backend.current_buffer().is_none() || key.modifiers.contains(KeyModifiers::CONTROL)
+        {
             return Ok(false);
         }
         if let KeyCode::Char(ch) = key.code {
             self.backend
                 .write_to_current_buffer(&ch.to_string())
-                .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| io::Error::other(e.to_string()))?;
 
-            return Ok(true);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn try_handle_special_keys(&mut self, key: KeyEvent) -> Result<bool, io::Error> {
+        if self.backend.current_buffer().is_none() {
+            return Ok(false);
         }
         match key.code {
             KeyCode::Enter => {
                 self.backend
                     .write_to_current_buffer("\n")
-                    .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
+                    .map_err(|e| io::Error::other(e.to_string()))?;
                 Ok(true)
             }
             KeyCode::Tab => {
                 self.backend
                     .write_to_current_buffer("    ")
-                    .map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
+                    .map_err(|e| io::Error::other(e.to_string()))?;
                 Ok(true)
             }
             KeyCode::Backspace => {
@@ -519,7 +530,7 @@ impl App {
     }
 
     fn handle_save_operation(&mut self) {
-        if let Some(path) = self.backend.current_buffer_path() {
+        if let Some(_path) = self.backend.current_buffer_path() {
             if let Err(err) = self.backend.save_current_buffer() {
                 eprintln!("Failed to save buffer: {}", err);
             }
@@ -707,25 +718,6 @@ mod tests {
         assert_eq!(buf, expected)
     }
 
-    #[allow(dead_code)]
-    /// Helper function to assert the position to render the cursor at in the visible
-    /// buffer after syncing the buffer contents and cursor position from the backend.
-    fn assert_cursor_render_pos_no_input(app: &mut App, buf: &Buffer, expected: (u16, u16)) {
-        let cursor_position = app.backend.cursor_position();
-
-        if let Some(cp) = cursor_position {
-            app.ui_state
-                .buffer_state
-                .update_x_offset(buf.area, cp.offset);
-            app.ui_state.buffer_state.update_y_offset(buf.area, cp.line);
-        }
-
-        let pos = app
-            .ui_state
-            .calculate_cursor_for_buffer(buf.area, cursor_position);
-
-        assert_eq!(pos, expected.into());
-    }
     /// The cursor should not move past the bounds of the buffer
     #[test]
     fn test_cant_move_cursor_too_far_right() {

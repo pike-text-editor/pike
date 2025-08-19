@@ -13,7 +13,6 @@ impl From<KeyEvent> for KeyShortcut {
     }
 }
 
-#[allow(dead_code)]
 impl KeyShortcut {
     pub fn new(code: KeyCode, modifiers: KeyModifiers) -> KeyShortcut {
         KeyShortcut { code, modifiers }

@@ -12,16 +12,6 @@ use tui_input::{Input, InputRequest};
 
 use crate::pike::Highlight;
 
-/// We would like to have some struct which can be rendered
-/// as a list with given callbacks to be executed when something is
-/// selected (similarly to telescope.nvim) so that we can reuse
-/// it when searching for files or word occurrences in the cwd
-/// As of now, I can't look that far into the future without writing
-/// some code to know what fields this should keep and how it should
-/// behave, so it's empty
-#[allow(dead_code)]
-struct Picker {}
-
 const HIGHLIGHT_BG_SELECTED: Color = Color::Rgb(245, 206, 88);
 const HIGHLIGHT_BG_UNSELECTED: Color = Color::Rgb(240, 137, 48);
 
@@ -66,7 +56,6 @@ impl From<(&str, FileInputRole)> for FileInputState {
 
 /// Holds the information about the current state of the UI
 /// of the app.
-#[allow(dead_code)]
 #[derive(Default)]
 pub struct UIState {
     /// Offset of the currently rendered buffer
@@ -206,7 +195,6 @@ impl UIState {
 /// displayed from line 6 until either the end of the buffer ->
 /// BufferDisplayOffset{ 0, 6 }. Used to consistently shift the buffer
 /// when rendering. Persisted in UIState between renders.
-#[allow(dead_code)]
 #[derive(Default)]
 pub struct BufferDisplayOffset {
     /// X offset of the line pointed at by the cursor
@@ -215,12 +203,7 @@ pub struct BufferDisplayOffset {
     pub y: usize,
 }
 
-#[allow(dead_code)]
-impl BufferDisplayOffset {
-    pub fn new(x: usize, y: usize) -> Self {
-        BufferDisplayOffset { x, y }
-    }
-}
+impl BufferDisplayOffset {}
 #[derive(Default)]
 pub struct HighlightState {
     pub highlights: Vec<Highlight>,
@@ -234,7 +217,6 @@ pub struct BufferDisplayState {
     pub highlight_state: HighlightState,
 }
 
-#[allow(dead_code)]
 impl BufferDisplayState {
     pub fn new(offset: BufferDisplayOffset) -> Self {
         BufferDisplayState {

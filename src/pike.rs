@@ -33,14 +33,12 @@ pub struct Highlight {
 }
 
 /// Backend of the app
-#[allow(dead_code, unused_variables, unused_mut)]
 pub struct Pike {
     workspace: Workspace,
     config: Config,
     cursor_history: CursorHistory,
 }
 
-#[allow(dead_code, unused_variables, unused_mut)]
 impl Pike {
     /// Create a new instance of Pike in a given directory
     pub fn build(
@@ -171,8 +169,6 @@ impl Pike {
 
             let lines: Vec<&str> = data.split('\n').collect();
 
-            let current_line_length = lines.get(pos.line).map_or(0, |line| line.len());
-
             if pos.offset == 0 && pos.line > 0 {
                 buffer.cursor.move_up();
 
@@ -225,6 +221,7 @@ impl Pike {
 
     /// Returns whether the current buffer has unsaved changes or
     /// false if it's empty
+    #[cfg(test)]
     pub fn has_unsaved_changes(&self) -> bool {
         match &self.current_buffer() {
             Some(buffer) => buffer.modified(),
@@ -399,6 +396,7 @@ impl Pike {
     }
 
     /// Returns the length of the current line
+    #[cfg(test)]
     pub fn current_line_length(&self) -> usize {
         let current_line_number = self.cursor_position().map_or(0, |pos| pos.line);
         match self
@@ -503,11 +501,6 @@ impl Pike {
                 buf.cursor.move_to(pos);
             }
         }
-    }
-
-    /// Returns the current working directory as a pathbuf
-    fn cwd(&self) -> PathBuf {
-        self.workspace.path.clone()
     }
 
     /// Gets an operation corresponding to a key shortcut
