@@ -93,17 +93,20 @@ impl UIState {
 
         let max_x = {
             let (x, _) = Self::max_rect_position(area);
-            x.saturating_sub(border_offset)
+            x.saturating_sub(border_offset) as usize
         };
 
         let (base_x, base_y) = {
             let (x, y) = Self::base_rect_position(area);
-            (x + border_offset, y)
+            ((x + border_offset) as usize, y as usize)
         };
 
-        let offset = input.cursor() as u16;
+        let offset = input.cursor();
 
-        TerminalPosition::new(min(base_x + offset, max_x), base_y + border_offset)
+        TerminalPosition::new(
+            min(base_x + offset, max_x) as u16,
+            base_y as u16 + border_offset,
+        )
     }
 
     /// Calculate position for buffer
@@ -118,11 +121,11 @@ impl UIState {
             let (max_x, max_y) = Self::max_rect_position(area);
             let (base_x, base_y) = Self::base_rect_position(area);
 
-            let x_offset = self.buffer_state.offset.x as u16;
-            let y_offset = self.buffer_state.offset.y as u16;
+            let x_offset = self.buffer_state.offset.x;
+            let y_offset = self.buffer_state.offset.y;
 
-            let x = (base_x + cursor_pos.offset as u16).saturating_sub(x_offset);
-            let y = (base_y + cursor_pos.line as u16).saturating_sub(y_offset);
+            let x = (base_x + cursor_pos.offset as u16).saturating_sub(x_offset as u16);
+            let y = (base_y + cursor_pos.line as u16).saturating_sub(y_offset as u16);
 
             TerminalPosition {
                 x: min(x, max_x),
@@ -227,7 +230,7 @@ impl BufferDisplayState {
 
     /// Updates the x offset of the buffer so that the cursor is always visible
     pub fn update_x_offset(&mut self, area: Rect, cursor_offset_x: usize) {
-        let too_far_right = cursor_offset_x as u16 >= self.offset.x as u16 + area.width;
+        let too_far_right = cursor_offset_x >= self.offset.x + area.width as usize;
         if too_far_right {
             self.offset.x = cursor_offset_x
                 .saturating_sub(area.width as usize)
@@ -240,7 +243,7 @@ impl BufferDisplayState {
 
     /// Updates the y offset of the buffer so that the cursor is always visible
     pub fn update_y_offset(&mut self, area: Rect, cursor_line: usize) {
-        let too_far_down = cursor_line as u16 >= self.offset.y as u16 + area.height;
+        let too_far_down = cursor_line >= self.offset.y + area.height as usize;
         if too_far_down {
             self.offset.y = cursor_line
                 .saturating_sub(area.height as usize)
@@ -264,7 +267,7 @@ impl BufferDisplayState {
     /// Shifts the content of the buffer to the right by the offset and returns the resulting
     /// string. Basically, takes every line and removes line[0:self.offset.x] from it, then
     /// joins and returns them.
-    fn shift_contents_right(&mut self, contents: String) -> String {
+    fn shift_contents_right(&mut self, contents: &str) -> String {
         contents
             .lines()
             .map(|line| {
@@ -279,7 +282,7 @@ impl BufferDisplayState {
     /// resulting string.
     fn shift_contents(&mut self, contents: &str) -> String {
         let down_shifted = self.shift_contents_down(contents);
-        self.shift_contents_right(down_shifted)
+        self.shift_contents_right(&down_shifted)
     }
 
     /// Adds highlights to the given contents and returns a Text widget with the highlights applied.

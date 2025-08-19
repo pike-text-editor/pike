@@ -42,8 +42,8 @@ pub struct Pike {
 impl Pike {
     /// Create a new instance of Pike in a given directory
     pub fn build(
-        cwd: PathBuf,
-        cwf: Option<PathBuf>,
+        cwd: &Path,
+        current_file: Option<PathBuf>,
         mut config_file: Option<PathBuf>,
     ) -> Result<Pike, String> {
         // If no config path is provided, check if the default config file exists
@@ -51,22 +51,22 @@ impl Pike {
             let default_config_file_path = config::default_config_file_path();
             if let Ok(default_config_path) = default_config_file_path {
                 if default_config_path.exists() {
-                    config_file = Some(default_config_path.to_path_buf());
+                    config_file = Some(default_config_path.clone());
                 }
             }
         }
 
         let mut workspace =
-            Workspace::new(&cwd, None).map_err(|e| format!("Error creating workspace: {}", e))?;
+            Workspace::new(cwd, None).map_err(|e| format!("Error creating workspace: {e}"))?;
 
-        if let Some(cwf) = cwf {
+        if let Some(cwf) = current_file {
             // Check if file exits, if not, create it
             if !cwf.exists() {
                 if let Some(parent) = cwf.parent() {
                     fs::create_dir_all(parent)
-                        .map_err(|e| format!("Failed to create directory: {}", e))?;
+                        .map_err(|e| format!("Failed to create directory: {e}"))?;
                 }
-                File::create(&cwf).map_err(|e| format!("Failed to create file: {}", e))?;
+                File::create(&cwf).map_err(|e| format!("Failed to create file: {e}"))?;
             }
             // Open the given file
             workspace
@@ -76,7 +76,7 @@ impl Pike {
         Ok(Pike {
             workspace,
             config: Config::from_file(config_file.as_deref())
-                .map_err(|e| format!("Error loading config: {}", e))?,
+                .map_err(|e| format!("Error loading config: {e}"))?,
             cursor_history: CursorHistory::default(),
         })
     }
@@ -104,7 +104,7 @@ impl Pike {
         if !path.exists() {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)
-                    .map_err(|e| format!("Failed to create directory: {}", e))?;
+                    .map_err(|e| format!("Failed to create directory: {e}"))?;
             }
 
             File::create(path).map_err(|e| {
@@ -196,7 +196,7 @@ impl Pike {
     pub fn current_buffer_contents(&self) -> String {
         match self.current_buffer().as_ref() {
             Some(buffer) => buffer.data(),
-            None => String::from(""),
+            None => String::new(),
         }
     }
 
@@ -213,9 +213,9 @@ impl Pike {
             Some(path) => path
                 .file_name()
                 .and_then(|file_name| file_name.to_str())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .expect("Failed to convert filename to string"),
-            None => String::from(""),
+            None => String::new(),
         }
     }
 
@@ -452,6 +452,7 @@ impl Pike {
     pub fn save_current_buffer(&mut self) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
+                let _ = buffer.data();
                 buffer.save().expect("Failed to save buffer");
 
                 Ok(())
@@ -540,13 +541,13 @@ mod pike_test {
         let cwd = PathBuf::from(dir.as_path())
             .canonicalize()
             .expect("Failed to canonicalize path");
-        let cwf = cwf_content.map(temp_file_with_contents);
+        let current_file = cwf_content.map(temp_file_with_contents);
         let config_file = config_content.map(temp_file_with_contents);
-        let cwf_path = cwf.as_ref().map(|f| f.path().to_path_buf());
+        let cwf_path = current_file.as_ref().map(|f| f.path().to_path_buf());
         let config_path = config_file.as_ref().map(|f| f.path().to_path_buf());
 
         (
-            Pike::build(cwd.clone(), cwf_path, config_path).expect("Failed to build Pike"),
+            Pike::build(&cwd, cwf_path, config_path).expect("Failed to build Pike"),
             cwd,
         )
     }
@@ -617,10 +618,10 @@ mod pike_test {
 
     #[test]
     fn test_open_file_non_zero_offset() {
-        let file_contents = r#"
+        let file_contents = r"
             Hello,
             World
-            "#;
+                ";
         let file = temp_file_with_contents(file_contents);
         let mut pike = tmp_pike_and_working_dir(None, None).0;
         pike.open_file(file.path(), 1, 2)
@@ -647,10 +648,10 @@ mod pike_test {
 
     #[test]
     fn test_open_file_out_of_bounds_offset() {
-        let file_contents = r#"
+        let file_contents = r"
             Hello,
             World
-            "#;
+                ";
         let file = temp_file_with_contents(file_contents);
         let mut pike = tmp_pike_and_working_dir(None, None).0;
         pike.open_file(file.path(), 2, 100)
@@ -707,7 +708,7 @@ mod pike_test {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Trying to save a non-existent buffer")]
     fn test_save_buffer_no_path() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
         pike.open_new_buffer();
@@ -786,9 +787,9 @@ mod pike_test {
     /// cursor position should be clamped to its length
     #[test]
     fn test_move_cursor_down_shorter_line() {
-        let contents = r#"Hello!
+        let contents = r"Hello!
 
-        This is a test."#;
+            This is a test.";
         let (mut pike, _) = tmp_pike_and_working_dir(None, Some(contents));
         for _ in 0..5 {
             pike.move_cursor_right();
@@ -1047,7 +1048,7 @@ mod pike_test {
 
         let contents_from_file =
             fs::read_to_string(file_path).expect("std::fs failed to read from file");
-        assert_eq!(file_contents, contents_from_file)
+        assert_eq!(file_contents, contents_from_file);
     }
 
     #[test]

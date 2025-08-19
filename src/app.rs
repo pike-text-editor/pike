@@ -44,8 +44,11 @@ impl App {
         let config_path = args.config.map(PathBuf::from);
         let file_path = args.file.map(PathBuf::from);
 
-        let backend: Result<Pike, String> =
-            Pike::build(cwd.expect("Error case was handled"), file_path, config_path);
+        let backend: Result<Pike, String> = Pike::build(
+            &cwd.expect("Error case was handled"),
+            file_path,
+            config_path,
+        );
 
         match backend {
             Ok(backend) => App::new(backend),
