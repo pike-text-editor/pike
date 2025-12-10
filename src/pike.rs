@@ -452,6 +452,9 @@ impl Pike {
     pub fn save_current_buffer(&mut self) -> Result<(), String> {
         match &mut self.workspace.current_buffer {
             Some(buffer) => {
+                if buffer.path.is_none() {
+                    return Err("Trying to save buffer with no path".to_string());
+                }
                 let _ = buffer.data();
                 buffer.save().expect("Failed to save buffer");
 
@@ -708,13 +711,11 @@ mod pike_test {
     }
 
     #[test]
-    #[should_panic(expected = "Trying to save a non-existent buffer")]
     fn test_save_buffer_no_path() {
         let mut pike = tmp_pike_and_working_dir(None, None).0;
         pike.open_new_buffer();
-        // This situation should not happen as it's handled in the UI, so a panic here
-        // is expected
-        let _ = pike.save_current_buffer();
+        // handled in the ui anyway
+        assert!(pike.save_current_buffer().is_err());
     }
 
     #[test]
