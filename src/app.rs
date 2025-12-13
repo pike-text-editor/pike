@@ -504,7 +504,11 @@ impl App {
                 Ok(true)
             }
             KeyCode::Backspace => {
-                self.backend.delete_character_from_current_buffer();
+                self.backend.delete_character_before_cursor();
+                Ok(true)
+            }
+            KeyCode::Delete => {
+                self.backend.delete_char_under_cursor();
                 Ok(true)
             }
             _ => Ok(false),

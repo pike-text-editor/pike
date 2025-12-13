@@ -159,7 +159,7 @@ impl Pike {
     }
 
     /// Deletes a characted and moves the cursor left
-    pub fn delete_character_from_current_buffer(&mut self) {
+    pub fn delete_character_before_cursor(&mut self) {
         if let Some(buffer) = &mut self.workspace.current_buffer {
             let pos = buffer.cursor.position;
 
@@ -188,6 +188,16 @@ impl Pike {
                 buffer.cursor.move_left();
                 buffer.delete();
             }
+        }
+    }
+
+    pub fn delete_char_under_cursor(&mut self) {
+        if let Some(buffer) = &mut self.workspace.current_buffer {
+            let pos = buffer.cursor.position;
+
+            self.cursor_history.record_undo_position(pos);
+
+            buffer.delete();
         }
     }
 
