@@ -38,7 +38,7 @@ pub mod ui {
     /// the given index
     pub fn nth_line_from_terminal_buffer(buf: &Buffer, n: u16) -> String {
         let width = buf.area.width;
-        let line = (0..width).fold(String::from(""), |acc, x| {
+        let line = (0..width).fold(String::new(), |acc, x| {
             acc + buf
                 .cell::<(u16, u16)>((x, n))
                 .expect("Iterating from 0 to buf.width should not go out of its bounds")

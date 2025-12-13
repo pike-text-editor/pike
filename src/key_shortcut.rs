@@ -13,17 +13,16 @@ impl From<KeyEvent> for KeyShortcut {
     }
 }
 
-#[allow(dead_code)]
 impl KeyShortcut {
     pub fn new(code: KeyCode, modifiers: KeyModifiers) -> KeyShortcut {
         KeyShortcut { code, modifiers }
     }
 
-    /// Creates a new KeyShortcut based on a string from a config file.
-    /// String representation of the shortcut follows the VSCode notation,
+    /// Creates a new `KeyShortcut` based on a string from a config file.
+    /// String representation of the shortcut follows the `VSCode` notation,
     /// e.g. ctrl+shift+p, ctrl+alt+del
     pub fn from_string(s: &str) -> Result<KeyShortcut, String> {
-        let elements_lowercase = s.split("+").map(|s| s.to_lowercase());
+        let elements_lowercase = s.split('+').map(str::to_lowercase);
         let mut modifiers = KeyModifiers::empty();
         let mut code = KeyCode::Null;
 
@@ -53,7 +52,7 @@ impl KeyShortcut {
     }
 }
 
-/// Returns a KeyModifiers object from a string representation
+/// Returns a `KeyModifiers` object from a string representation
 /// or None if it does not match any.
 fn key_modifier_from_string(s: &str) -> Option<KeyModifiers> {
     match s {
@@ -64,7 +63,7 @@ fn key_modifier_from_string(s: &str) -> Option<KeyModifiers> {
     }
 }
 
-/// Returns a KeyCode from a string representation.
+/// Returns a `KeyCode` from a string representation.
 /// The input should be mappable to a valid keycode and not a modifier.
 fn keycode_from_string(s: &str) -> Result<KeyCode, String> {
     let return_value = match s {
@@ -134,7 +133,7 @@ mod key_shortcut_test {
             (KeyEvent::new(KeyCode::F(1), KeyModifiers::SHIFT)),
         ];
 
-        let shortcuts: [KeyShortcut; 7] = events.map(|event| event.into());
+        let shortcuts: [KeyShortcut; 7] = events.map(std::convert::Into::into);
 
         for (event, shortcut) in events.iter().zip(shortcuts.iter()) {
             assert_eq!(
@@ -152,7 +151,7 @@ mod key_shortcut_test {
 
     #[test]
     fn from_string_valid_test_cases() {
-        let strings_and_keymaps = vec![
+        let strings_and_keymaps = [
             (
                 "q",
                 KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::empty()),

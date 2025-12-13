@@ -1,4 +1,3 @@
-#[allow(dead_code, unused_variables, unused_mut)]
 /// Every keymappable operation within pike
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Operation {
@@ -13,7 +12,6 @@ pub enum Operation {
     Quit,
 }
 
-#[allow(dead_code, unused_variables, unused_mut)]
 impl Operation {
     /// Creates a new Operation from a string from a config file
     pub fn from_string(query: &str) -> Result<Operation, String> {

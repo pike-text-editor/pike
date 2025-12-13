@@ -34,7 +34,6 @@ pub struct Config {
     pub key_mappings: HashMap<KeyShortcut, Operation>,
 }
 
-#[allow(dead_code)]
 impl Config {
     /// Creates a config instance based on toml string representation
     pub fn from_toml_representation(s: &str) -> Result<Config, String> {
@@ -96,12 +95,12 @@ impl Config {
             let op = Operation::from_string(op.as_str().unwrap())?;
 
             if !seen_shortcuts.insert(shortcut.clone()) {
-                return Err(format!("Duplicate keybinding found: {:?}", shortcut));
+                return Err(format!("Duplicate keybinding found: {shortcut:?}"));
             }
 
             // Check for duplicate operations
             if !seen_operations.insert(op.clone()) {
-                return Err(format!("Duplicate keymap operation found: {:?}", op));
+                return Err(format!("Duplicate keymap operation found: {op:?}"));
             }
 
             return_value.push((op, shortcut));

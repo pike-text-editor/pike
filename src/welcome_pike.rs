@@ -1,4 +1,4 @@
-pub const WELCOME_MESSAGE: &str = r#"
+pub const WELCOME_MESSAGE: &str = r"
                                                                                                                                           
                                                                                                   
                                                                                                                                                                                                     
@@ -31,4 +31,4 @@ pub const WELCOME_MESSAGE: &str = r#"
                                                                                                   
                                                                                                   
                                                                                                   
-"#;
+";
